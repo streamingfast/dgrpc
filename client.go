@@ -1,0 +1,65 @@
+// Copyright 2019 dfuse Platform Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package dgrpc
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/dfuse-io/derr"
+	"go.opencensus.io/plugin/ocgrpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/balancer/roundrobin"
+	"google.golang.org/grpc/keepalive"
+)
+
+var balancerDialOption = grpc.WithBalancerName(roundrobin.Name)
+var insecureDialOption = grpc.WithInsecure()
+var tracingDialOption = grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
+var maxCallRecvMsgSize = 1024 * 1024 * 100
+var defaultCallOptions = []grpc.CallOption{grpc.MaxCallRecvMsgSize(maxCallRecvMsgSize), grpc.WaitForReady(true)}
+
+var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
+	Time:                30 * time.Second, // send pings every (x seconds) there is no activity
+	Timeout:             10 * time.Second, // wait that amount of time for ping ack before considering the connection dead
+	PermitWithoutStream: true,             // send pings even without active streams
+})
+
+// NewInternalClient creates a grpc ClientConn with keepalive, tracing and *insecure TLS*
+// debug me using `export GODEBUG=http2debug=2`
+func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(
+		remoteAddr,
+		tracingDialOption,
+		balancerDialOption,
+		insecureDialOption,
+		keepaliveDialOption,
+		grpc.WithDefaultCallOptions(defaultCallOptions...),
+	)
+	return conn, err
+}
+
+// NewExternalClient creates a grpc ClientConn with keepalive, tracing and secure TLS
+func NewExternalClient(remoteAddr string) *grpc.ClientConn {
+	conn, err := grpc.Dial(
+		remoteAddr,
+		tracingDialOption,
+		balancerDialOption,
+		keepaliveDialOption,
+		grpc.WithDefaultCallOptions(defaultCallOptions...),
+	)
+	derr.Check(fmt.Sprintf("unable to create grpc connection to %q", remoteAddr), err)
+	return conn
+}
