@@ -68,8 +68,6 @@ func withTraceID(ctx context.Context, logger *zap.Logger, overrideTraceID bool) 
 	// We add `trace_id` to grcp_zap middleware fields, since in the middleware, those fields are added when logging the gRPC call result
 	ctxzap.AddFields(ctx, zap.String("trace_id", rootTraceID))
 
-	// we will preserve the trace id (if there is one). This should occur on down stream service (i.e. Router, Search Backends....)
-	logger.Debug("preserving trace id", zap.String("trace_id", rootTraceID))
 	return ctx
 
 }
