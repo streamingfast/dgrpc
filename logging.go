@@ -16,6 +16,7 @@ package dgrpc
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/dfuse-io/logging"
@@ -30,16 +31,25 @@ var zlog *zap.Logger
 
 func init() {
 	logging.Register("github.com/dfuse-io/dgrpc", &zlog)
-	setupGrpcInternalLogger()
+
+	if logger, err := setupGrpcInternalLogger(); err != nil {
+		if zlog != nil {
+			zlog.Warn("unable to setup internal grpc logger", zap.Error(err))
+		} else {
+			fmt.Fprintf(os.Stderr, "unable to setup internal grpc logger: %s", err)
+		}
+	} else {
+		logging.Register("github.com/dfuse-io/dgrpc/internal_grpc", &logger)
+	}
 }
 
-func setupGrpcInternalLogger(opts ...zap.Option) error {
+func setupGrpcInternalLogger(opts ...zap.Option) (*zap.Logger, error) {
 	grpcAtomicLevel := zap.NewAtomicLevelAt(zap.ErrorLevel)
 	grpcUserSpecifiedLevel := os.Getenv("GRPC_GO_ZAP_LEVEL")
 	if grpcUserSpecifiedLevel != "" {
 		err := grpcAtomicLevel.UnmarshalText([]byte(grpcUserSpecifiedLevel))
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -47,13 +57,13 @@ func setupGrpcInternalLogger(opts ...zap.Option) error {
 
 	grpcInternalZlog, err := config.Build(opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Level 0 verbosity in grpc-go less chatty
 	// https://github.com/grpc/grpc-go/blob/master/Documentation/log_levels.md
 	grpc_zap.ReplaceGrpcLoggerV2(grpcInternalZlog)
-	return nil
+	return grpcInternalZlog, nil
 }
 
 func setupLoggingInterceptors(logger *zap.Logger) (grpc.UnaryServerInterceptor, grpc.StreamServerInterceptor) {
