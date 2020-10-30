@@ -105,7 +105,6 @@ func manageConnections(ctx context.Context, target resolver.Target, cc resolver.
 		if !firstTime {
 			select {
 			case <-ctx.Done():
-				fmt.Println("got context err", ctx.Err())
 				return
 			case <-time.After(time.Second * 5):
 			}
@@ -122,6 +121,7 @@ func manageConnections(ctx context.Context, target resolver.Target, cc resolver.
 		ips, err := net.LookupIP(host)
 		if err != nil {
 			zlog.Warn("cannot resolve grpc endpoint", zap.String("target_endpoint", target.Endpoint))
+			time.Sleep(time.Second * 5)
 			continue
 		}
 		for _, ip := range ips {
