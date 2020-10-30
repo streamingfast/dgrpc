@@ -37,17 +37,17 @@ func init() {
 
 func registerBetterDNSResolver(scheme string) {
 	r := &Resolver{
-		ResolveNowCallback: func(resolver.ResolveNowOptions) {},
-		scheme:             scheme,
+		scheme: scheme,
+		rn:     make(chan struct{}, 1),
 	}
 	resolver.Register(r)
 }
 
 // Resolver works by launching a ConnStateManager function when Build() is called.
 type Resolver struct {
-	ResolveNowCallback func(resolver.ResolveNowOptions)
-	scheme             string
-	cancelContext      context.CancelFunc
+	scheme        string
+	cancelContext context.CancelFunc
+	rn            chan struct{}
 }
 
 func parseTarget(target string) (host, port string, err error) {
@@ -97,9 +97,10 @@ func sameAddresses(a1, a2 []resolver.Address) bool {
 
 }
 
-func manageConnections(ctx context.Context, target resolver.Target, cc resolver.ClientConn, _ resolver.BuildOptions) {
+func manageConnections(ctx context.Context, target resolver.Target, cc resolver.ClientConn, _ resolver.BuildOptions, rn chan struct{}) {
 	firstTime := true
 	lastAddresses := []resolver.Address{}
+	var forceUpdate bool
 
 	for {
 		if !firstTime {
@@ -107,6 +108,8 @@ func manageConnections(ctx context.Context, target resolver.Target, cc resolver.
 			case <-ctx.Done():
 				return
 			case <-time.After(time.Second * 5):
+			case <-rn:
+				forceUpdate = true
 			}
 		}
 		firstTime = false
@@ -131,12 +134,13 @@ func manageConnections(ctx context.Context, target resolver.Target, cc resolver.
 			})
 		}
 
-		if !sameAddresses(addresses, lastAddresses) {
+		if !sameAddresses(addresses, lastAddresses) || forceUpdate {
 			zlog.Debug("updating resolver state", zap.Any("addresses", addresses))
 			cc.UpdateState(resolver.State{
 				Addresses: addresses,
 			})
 			lastAddresses = addresses
+			forceUpdate = false
 		}
 	}
 }
@@ -145,7 +149,7 @@ func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts re
 	ctx, cancel := context.WithCancel(context.Background())
 	r.cancelContext = cancel
 
-	go manageConnections(ctx, target, cc, opts)
+	go manageConnections(ctx, target, cc, opts, r.rn)
 	return r, nil
 }
 
@@ -154,8 +158,11 @@ func (r *Resolver) Scheme() string {
 }
 
 // ResolveNow is a noop for Resolver.
-func (r *Resolver) ResolveNow(o resolver.ResolveNowOptions) {
-	r.ResolveNowCallback(o)
+func (r *Resolver) ResolveNow(resolver.ResolveNowOptions) {
+	select {
+	case r.rn <- struct{}{}:
+	default:
+	}
 }
 
 // Close will close the context
