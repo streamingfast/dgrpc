@@ -15,10 +15,15 @@
 package dgrpc
 
 import (
+	"crypto/tls"
+	"fmt"
+	"net"
+	"net/http"
+	"strings"
 	"time"
 
-	"google.golang.org/grpc/codes"
-
+	"github.com/dfuse-io/dgrpc/insecure"
+	"github.com/gorilla/mux"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -27,6 +32,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
@@ -168,4 +174,78 @@ func defaultServerCodeLevel(code codes.Code) zapcore.Level {
 	}
 
 	return grpc_zap.DefaultCodeToLevel(code)
+}
+
+func SimpleHealthCheck(isDown func() bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if isDown() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Write([]byte("ok"))
+	}
+}
+
+func SimpleHTTPServer(srv *grpc.Server, listenAddr string, healthHandler http.HandlerFunc) *http.Server {
+	router := mux.NewRouter()
+
+	if healthHandler != nil {
+		router.Path("/").HandlerFunc(healthHandler)
+		router.Path("/healthz").HandlerFunc(healthHandler)
+	}
+
+	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv.ServeHTTP(w, r)
+	})
+	errorLogger, err := zap.NewStdLogAt(zlog, zap.ErrorLevel)
+	if err != nil {
+		panic(fmt.Errorf("unable to create logger: %w", err))
+	}
+
+	addr, insecure := insecureAddr(listenAddr)
+
+	httpSrv := &http.Server{
+		Addr:     addr,
+		Handler:  router,
+		ErrorLog: errorLogger,
+	}
+
+	if !insecure {
+		httpSrv.TLSConfig = snakeoilTLS()
+	}
+
+	return httpSrv
+}
+
+func ListenAndServe(srv *http.Server) error {
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return fmt.Errorf("tcp listen %q: %w", srv.Addr, err)
+	}
+
+	if srv.TLSConfig != nil {
+		if err := srv.ServeTLS(listener, "", ""); err != nil {
+			return fmt.Errorf("tls http server Serve: %w", err)
+		}
+	} else {
+		if err := srv.Serve(listener); err != nil {
+			return fmt.Errorf("insecure http server Serve: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func snakeoilTLS() *tls.Config {
+	return &tls.Config{
+		Certificates: []tls.Certificate{insecure.Cert},
+		ClientCAs:    insecure.CertPool,
+		ClientAuth:   tls.VerifyClientCertIfGiven,
+	}
+}
+
+func insecureAddr(in string) (out string, insecure bool) {
+	insecure = strings.Contains(in, "*")
+	out = strings.Replace(in, "*", "", -1)
+	return
 }
