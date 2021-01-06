@@ -15,10 +15,8 @@
 package dgrpc
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/dfuse-io/derr"
 	"go.opencensus.io/plugin/ocgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/balancer/roundrobin"
@@ -52,7 +50,7 @@ func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 }
 
 // NewExternalClient creates a grpc ClientConn with keepalive, tracing and secure TLS
-func NewExternalClient(remoteAddr string) *grpc.ClientConn {
+func NewExternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(
 		remoteAddr,
 		tracingDialOption,
@@ -60,6 +58,5 @@ func NewExternalClient(remoteAddr string) *grpc.ClientConn {
 		keepaliveDialOption,
 		grpc.WithDefaultCallOptions(defaultCallOptions...),
 	)
-	derr.Check(fmt.Sprintf("unable to create grpc connection to %q", remoteAddr), err)
-	return conn
+	return conn, err
 }
