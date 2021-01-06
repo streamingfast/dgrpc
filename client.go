@@ -20,12 +20,14 @@ import (
 	"go.opencensus.io/plugin/ocgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/balancer/roundrobin"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 )
 
 var balancerDialOption = grpc.WithBalancerName(roundrobin.Name)
 var insecureDialOption = grpc.WithInsecure()
 var tracingDialOption = grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
+var tlsClientDialOption = grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, ""))
 var maxCallRecvMsgSize = 1024 * 1024 * 100
 var defaultCallOptions = []grpc.CallOption{grpc.MaxCallRecvMsgSize(maxCallRecvMsgSize), grpc.WaitForReady(true)}
 
@@ -50,13 +52,18 @@ func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 }
 
 // NewExternalClient creates a grpc ClientConn with keepalive, tracing and secure TLS
-func NewExternalClient(remoteAddr string) (*grpc.ClientConn, error) {
-	conn, err := grpc.Dial(
-		remoteAddr,
+func NewExternalClient(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	opts := []grpc.DialOption{
 		tracingDialOption,
 		balancerDialOption,
 		keepaliveDialOption,
+		tlsClientDialOption,
 		grpc.WithDefaultCallOptions(defaultCallOptions...),
-	)
-	return conn, err
+	}
+
+	if len(extraOpts) > 0 {
+		opts = append(opts, extraOpts...)
+	}
+
+	return grpc.Dial(remoteAddr, opts...)
 }
