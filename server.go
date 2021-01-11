@@ -15,6 +15,7 @@
 package dgrpc
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -34,7 +35,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 // Verbosity is configuration that can be used to globally reduce
@@ -53,6 +56,7 @@ var Verbosity = 3
 type serverOptions struct {
 	logger          *zap.Logger
 	overrideTraceID bool
+	authCheckerFunc AuthCheckerFunc
 }
 
 func newServerOptions() *serverOptions {
@@ -65,6 +69,16 @@ func newServerOptions() *serverOptions {
 // ServerOption represents option that can be used when constructing a gRPC
 // server to customize its behavior.
 type ServerOption func(*serverOptions)
+
+type AuthCheckerFunc func(ctx context.Context, token, ipAddress string) (context.Context, error)
+
+// WithAuthChecker option can be used to pass a function that will be called
+// on connection, validating authentication with 'Authorization: bearer' header
+func WithAuthChecker(authChecker AuthCheckerFunc) ServerOption {
+	return func(options *serverOptions) {
+		options.authCheckerFunc = authChecker
+	}
+}
 
 // WithLogger option can be used to pass the logger that should be used to
 // log stuff within the various middlewares
@@ -124,6 +138,11 @@ func NewServer(options ...ServerOption) *grpc.Server {
 		zapUnaryInterceptor, // zap base server interceptor
 		unaryTraceID,        // adds trace_id to ctx
 		unaryLog,            // adds logger to context
+	}
+
+	if serverOptions.authCheckerFunc != nil {
+		unaryInterceptors = append(unaryInterceptors, unaryAuthChecker(serverOptions.authCheckerFunc))
+		streamInterceptors = append(streamInterceptors, streamAuthChecker(serverOptions.authCheckerFunc))
 	}
 
 	s := grpc.NewServer(
@@ -248,4 +267,67 @@ func insecureAddr(in string) (out string, insecure bool) {
 	insecure = strings.Contains(in, "*")
 	out = strings.Replace(in, "*", "", -1)
 	return
+}
+
+func unaryAuthChecker(check AuthCheckerFunc) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context,
+		req interface{},
+		_ *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler) (interface{}, error) {
+
+		if err := validateAuth(check, ctx); err != nil {
+			return nil, err
+		}
+		return handler(ctx, req)
+	}
+}
+
+func streamAuthChecker(check AuthCheckerFunc) grpc.StreamServerInterceptor {
+	return func(srv interface{},
+		ss grpc.ServerStream,
+		info *grpc.StreamServerInfo,
+		handler grpc.StreamHandler) error {
+
+		if err := validateAuth(check, ss.Context()); err != nil {
+			return err
+		}
+		return handler(srv, ss)
+	}
+}
+
+// validateAuth can auth info to the context
+func validateAuth(check AuthCheckerFunc, ctx context.Context) error {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		err := status.Errorf(codes.Unauthenticated, "missing metadata")
+		return err
+	}
+
+	authValues := md["authorization"]
+	if len(authValues) < 1 {
+		err := status.Errorf(codes.Unauthenticated, "missing 'authorization' metadata field")
+		return err
+	}
+	token := strings.TrimPrefix(authValues[0], "Bearer ")
+	ip := realIPFromMetadata(md)
+
+	var e error
+	ctx, e = check(ctx, token, ip)
+	if e != nil {
+		return status.Errorf(codes.Unauthenticated, e.Error())
+	}
+	return nil
+}
+
+func realIPFromMetadata(md metadata.MD) string {
+	xff := md.Get("x-forwarded-for")
+	forwardIPs := strings.Join(xff, ", ")
+	if forwardIPs != "" {
+		addresses := strings.Split(forwardIPs, ",")
+		if len(addresses) >= 2 {
+			return strings.TrimSpace(addresses[len(addresses)-2])
+		}
+	}
+
+	return "0.0.0.0"
 }
