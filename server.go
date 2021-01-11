@@ -36,6 +36,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
@@ -270,57 +271,53 @@ func insecureAddr(in string) (out string, insecure bool) {
 }
 
 func unaryAuthChecker(check AuthCheckerFunc) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context,
-		req interface{},
-		_ *grpc.UnaryServerInfo,
-		handler grpc.UnaryHandler) (interface{}, error) {
-
-		if err := validateAuth(check, ctx); err != nil {
+	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		childCtx, err := validateAuth(ctx, check)
+		if err != nil {
 			return nil, err
 		}
-		return handler(ctx, req)
+
+		return handler(childCtx, req)
 	}
 }
 
 func streamAuthChecker(check AuthCheckerFunc) grpc.StreamServerInterceptor {
-	return func(srv interface{},
-		ss grpc.ServerStream,
-		info *grpc.StreamServerInfo,
-		handler grpc.StreamHandler) error {
-
-		if err := validateAuth(check, ss.Context()); err != nil {
+	return func(srv interface{}, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		childCtx, err := validateAuth(ss.Context(), check)
+		if err != nil {
 			return err
 		}
-		return handler(srv, ss)
+
+		return handler(srv, authenticatedServerStream{ServerStream: ss, authenticatedContext: childCtx})
 	}
 }
 
 // validateAuth can auth info to the context
-func validateAuth(check AuthCheckerFunc, ctx context.Context) error {
+func validateAuth(ctx context.Context, check AuthCheckerFunc) (context.Context, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		err := status.Errorf(codes.Unauthenticated, "unable to authenticate request: missing metadata information, you must provide a valid dfuse API token through gRPC metadata")
-		return err
+		return ctx, err
 	}
 
 	authValues := md["authorization"]
 	if len(authValues) < 1 {
 		err := status.Errorf(codes.Unauthenticated, "unable to authenticate request: missing 'authorization' metadata field, you must provide a valid dfuse API token through gRPC metadata")
-		return err
+		return ctx, err
 	}
 
 	token := strings.TrimPrefix(authValues[0], "Bearer ")
-	ip := realIPFromMetadata(md)
+	ip := extractGRPCRealIP(ctx, md)
 
-	var e error
-	ctx, e = check(ctx, token, ip)
-	if e != nil {
-		return status.Errorf(codes.Unauthenticated, "unable to authenticate request: %s", e)
+	ctx, err := check(ctx, token, ip)
+	if err != nil {
+		return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: %s", err)
 	}
-	return nil
+
+	return ctx, err
 }
 
-func realIPFromMetadata(md metadata.MD) string {
+func extractGRPCRealIP(ctx context.Context, md metadata.MD) string {
 	xff := md.Get("x-forwarded-for")
 	forwardIPs := strings.Join(xff, ", ")
 	if forwardIPs != "" {
@@ -330,5 +327,25 @@ func realIPFromMetadata(md metadata.MD) string {
 		}
 	}
 
+	if peer, ok := peer.FromContext(ctx); ok {
+		switch addr := peer.Addr.(type) {
+		case *net.UDPAddr:
+			return addr.IP.String()
+		case *net.TCPAddr:
+			return addr.IP.String()
+		default:
+			zlog.Warn(fmt.Sprintf("unable to extract IP from gRPC peer, type %T is not handled yet", addr), zap.Stringer("addr", addr))
+		}
+	}
+
 	return "0.0.0.0"
+}
+
+type authenticatedServerStream struct {
+	grpc.ServerStream
+	authenticatedContext context.Context
+}
+
+func (s authenticatedServerStream) Context() context.Context {
+	return s.authenticatedContext
 }
