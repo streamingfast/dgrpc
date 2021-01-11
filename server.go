@@ -299,22 +299,23 @@ func streamAuthChecker(check AuthCheckerFunc) grpc.StreamServerInterceptor {
 func validateAuth(check AuthCheckerFunc, ctx context.Context) error {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		err := status.Errorf(codes.Unauthenticated, "missing metadata")
+		err := status.Errorf(codes.Unauthenticated, "unable to authenticate request: missing metadata information, you must provide a valid dfuse API token through gRPC metadata")
 		return err
 	}
 
 	authValues := md["authorization"]
 	if len(authValues) < 1 {
-		err := status.Errorf(codes.Unauthenticated, "missing 'authorization' metadata field")
+		err := status.Errorf(codes.Unauthenticated, "unable to authenticate request: missing 'authorization' metadata field, you must provide a valid dfuse API token through gRPC metadata")
 		return err
 	}
+
 	token := strings.TrimPrefix(authValues[0], "Bearer ")
 	ip := realIPFromMetadata(md)
 
 	var e error
 	ctx, e = check(ctx, token, ip)
 	if e != nil {
-		return status.Errorf(codes.Unauthenticated, e.Error())
+		return status.Errorf(codes.Unauthenticated, "unable to authenticate request: %s", e)
 	}
 	return nil
 }
