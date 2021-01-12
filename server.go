@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -55,9 +56,11 @@ import (
 var Verbosity = 3
 
 type serverOptions struct {
-	logger          *zap.Logger
-	overrideTraceID bool
-	authCheckerFunc AuthCheckerFunc
+	authCheckerFunc        AuthCheckerFunc
+	logger                 *zap.Logger
+	postUnaryInterceptors  []grpc.UnaryServerInterceptor
+	postStreamInterceptors []grpc.StreamServerInterceptor
+	overrideTraceID        bool
 }
 
 func newServerOptions() *serverOptions {
@@ -89,6 +92,22 @@ func WithLogger(logger *zap.Logger) ServerOption {
 	}
 }
 
+// WithPostUnaryInterceptor option can be used to add your own `grpc.UnaryServerInterceptor`
+// after all others defined automatically by the package.
+func WithPostUnaryInterceptor(interceptor grpc.UnaryServerInterceptor) ServerOption {
+	return func(options *serverOptions) {
+		options.postUnaryInterceptors = append(options.postUnaryInterceptors, interceptor)
+	}
+}
+
+// WithPostStreamInterceptor option can be used to add your own `grpc.StreamServerInterceptor`
+// after all others defined automatically by the package.
+func WithPostStreamInterceptor(interceptor grpc.StreamServerInterceptor) ServerOption {
+	return func(options *serverOptions) {
+		options.postStreamInterceptors = append(options.postStreamInterceptors, interceptor)
+	}
+}
+
 // OverrideTraceID option can be used to force the generation of a new fresh trace ID
 // for every gRPC request entering the middleware
 func OverrideTraceID() ServerOption {
@@ -101,19 +120,15 @@ func OverrideTraceID() ServerOption {
 // more.
 //
 // **Note** Debugging a gRPC server can be done by using `export GODEBUG=http2debug=2`
-func NewServer(options ...ServerOption) *grpc.Server {
-	serverOptions := newServerOptions()
-	for _, option := range options {
-		option(serverOptions)
+func NewServer(opts ...ServerOption) *grpc.Server {
+	options := newServerOptions()
+	for _, opt := range opts {
+		opt(options)
 	}
 
 	// GRPC server interceptor that injects in the context the trace_id, if trace_id override option is used it will
 	// simply create a new trace_id
-	unaryTraceID, streamTraceID := setupTracingInterceptors(serverOptions.logger, serverOptions.overrideTraceID)
-
-	// GRPC server intercept that injects in the context the wlooger with the correct trace_id. This is done so that
-	// `logging.Logger(ctx,zlog)` always yield a correct fully configured logger.
-	unaryLog, streamLog := setupLoggingInterceptors(serverOptions.logger)
+	unaryTraceID, streamTraceID := setupTracingInterceptors(options.logger, options.overrideTraceID)
 
 	zopts := []grpc_zap.Option{
 		grpc_zap.WithDurationField(grpc_zap.DurationToTimeMillisField),
@@ -122,28 +137,45 @@ func NewServer(options ...ServerOption) *grpc.Server {
 	}
 
 	// Zap base server interceptor
-	zapUnaryInterceptor := grpc_zap.UnaryServerInterceptor(serverOptions.logger, zopts...)
-	zapStreamInterceptor := grpc_zap.StreamServerInterceptor(serverOptions.logger.With(zap.String("trace_id", "")), zopts...)
+	zapUnaryInterceptor := grpc_zap.UnaryServerInterceptor(options.logger, zopts...)
+	zapStreamInterceptor := grpc_zap.StreamServerInterceptor(options.logger.With(zap.String("trace_id", "")), zopts...)
 
+	// Order of interceptors is important here, index order is followed so `{one, two, three}` runs `one` then `two` then `three` passing context along the way
 	streamInterceptors := []grpc.StreamServerInterceptor{
 		grpc_ctxtags.StreamServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 		grpc_prometheus.StreamServerInterceptor,
 		zapStreamInterceptor, // zap base server interceptor
 		streamTraceID,        // adds trace_id to ctx
-		streamLog,            // adds logger to context
 	}
 
+	// Order of interceptors is important here, index order is followed so `{one, two, three}` runs `one` then `two` then `three` passing context along the way
 	unaryInterceptors := []grpc.UnaryServerInterceptor{
 		grpc_ctxtags.UnaryServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 		grpc_prometheus.UnaryServerInterceptor,
 		zapUnaryInterceptor, // zap base server interceptor
 		unaryTraceID,        // adds trace_id to ctx
-		unaryLog,            // adds logger to context
 	}
 
-	if serverOptions.authCheckerFunc != nil {
-		unaryInterceptors = append(unaryInterceptors, unaryAuthChecker(serverOptions.authCheckerFunc))
-		streamInterceptors = append(streamInterceptors, streamAuthChecker(serverOptions.authCheckerFunc))
+	// Authentication is executed here, so the logger that will run after him can extract information from it
+	if options.authCheckerFunc != nil {
+		unaryInterceptors = append(unaryInterceptors, unaryAuthChecker(options.authCheckerFunc))
+		streamInterceptors = append(streamInterceptors, streamAuthChecker(options.authCheckerFunc))
+	}
+
+	// Adds contextualized logger to interceptors, must comes after authenticator since we extract stuff from there is available.
+	// The interceptor tries to extract the `trace_id` from the logger and configure the logger to always use it.
+	unaryLog, streamLog := setupLoggingInterceptors(options.logger)
+
+	unaryInterceptors = append(unaryInterceptors, unaryLog)
+	streamInterceptors = append(streamInterceptors, streamLog)
+
+	// Adds custom defined interceptors, they come after all others
+	if len(options.postUnaryInterceptors) > 0 {
+		unaryInterceptors = append(unaryInterceptors, options.postUnaryInterceptors...)
+	}
+
+	if len(options.postStreamInterceptors) > 0 {
+		streamInterceptors = append(streamInterceptors, options.postStreamInterceptors...)
 	}
 
 	s := grpc.NewServer(
@@ -181,6 +213,10 @@ func defaultLoggingDecider(fullMethodName string, err error) bool {
 func defaultServerCodeLevel(code codes.Code) zapcore.Level {
 	if Verbosity <= 2 {
 		if code == codes.OK {
+			return zap.DebugLevel
+		}
+
+		if code == codes.Unauthenticated {
 			return zap.DebugLevel
 		}
 
@@ -309,22 +345,24 @@ func validateAuth(ctx context.Context, check AuthCheckerFunc) (context.Context, 
 	token := strings.TrimPrefix(authValues[0], "Bearer ")
 	ip := extractGRPCRealIP(ctx, md)
 
-	ctx, err := check(ctx, token, ip)
+	authCtx, err := check(ctx, token, ip)
 	if err != nil {
 		return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: %s", err)
 	}
 
-	return ctx, err
+	return authCtx, err
 }
+
+var portSuffixRegex = regexp.MustCompile(":[0-9]{2,5}$")
 
 func extractGRPCRealIP(ctx context.Context, md metadata.MD) string {
 	xff := md.Get("x-forwarded-for")
-	forwardIPs := strings.Join(xff, ", ")
-	if forwardIPs != "" {
-		addresses := strings.Split(forwardIPs, ",")
-		if len(addresses) >= 2 {
-			return strings.TrimSpace(addresses[len(addresses)-2])
-		}
+	if len(xff) > 0 {
+		// The previous code was getting the element at index `len(xff) - 2`, frankly, I have
+		// no idea why, it makes no sense unless the value is exactly 2, otherwise as it grows,
+		// the ip address picked up will be in the middle of the slice. It should probably be
+		// either the first element 0 or the last one. I chose the to pick the last one.
+		return strings.TrimSpace(xff[len(xff)-1])
 	}
 
 	if peer, ok := peer.FromContext(ctx); ok {
@@ -334,7 +372,8 @@ func extractGRPCRealIP(ctx context.Context, md metadata.MD) string {
 		case *net.TCPAddr:
 			return addr.IP.String()
 		default:
-			zlog.Warn(fmt.Sprintf("unable to extract IP from gRPC peer, type %T is not handled yet", addr), zap.Stringer("addr", addr))
+			// Hopefully our port removal will work in (almost?) all cases
+			return portSuffixRegex.ReplaceAllLiteralString(peer.Addr.String(), "")
 		}
 	}
 

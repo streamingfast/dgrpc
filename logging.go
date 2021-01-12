@@ -71,7 +71,7 @@ func setupLoggingInterceptors(logger *zap.Logger) (grpc.UnaryServerInterceptor, 
 		return handler(withLogger(ctx, logger), req)
 	}
 
-	streamServerInterceptor := func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	streamServerInterceptor := func(srv interface{}, stream grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		wrapped := grpc_middleware.WrapServerStream(stream)
 		wrapped.WrappedContext = withLogger(stream.Context(), logger)
 
