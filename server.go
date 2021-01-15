@@ -164,21 +164,21 @@ func (s *Server) Launch(listenAddr string) {
 			return
 		}
 
-		srv := &http.Server{
+		s.httpServer = &http.Server{
 			Handler:  grpcRouter,
 			ErrorLog: errorLogger,
 		}
 
 		if s.options.secureTLSConfig != nil {
 			s.logger().Info("serving gRPC (over HTTP router) (encrypted)", zap.String("listen_addr", listenAddr))
-			srv.TLSConfig = s.options.secureTLSConfig
-			if err := srv.ServeTLS(tcpListener, "", ""); err != nil {
+			s.httpServer.TLSConfig = s.options.secureTLSConfig
+			if err := s.httpServer.ServeTLS(tcpListener, "", ""); err != nil {
 				s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve (TLS) failed: %w", err))
 				return
 			}
 		} else if s.options.isPlainText {
 			s.logger().Info("serving gRPC (over HTTP router) (plain-text)", zap.String("listen_addr", listenAddr))
-			if err := srv.Serve(tcpListener); err != nil {
+			if err := s.httpServer.Serve(tcpListener); err != nil {
 				s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
 				return
 			}
