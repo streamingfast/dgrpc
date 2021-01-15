@@ -169,19 +169,22 @@ func (s *Server) Launch(listenAddr string) {
 			ErrorLog: errorLogger,
 		}
 
-		if s.options.secureTLSConfig == nil {
+		if s.options.secureTLSConfig != nil {
 			s.logger().Info("serving gRPC (over HTTP router) (encrypted)", zap.String("listen_addr", listenAddr))
 			srv.TLSConfig = s.options.secureTLSConfig
 			if err := srv.ServeTLS(tcpListener, "", ""); err != nil {
 				s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve (TLS) failed: %w", err))
 				return
 			}
-		} else {
+		} else if s.options.isPlainText {
 			s.logger().Info("serving gRPC (over HTTP router) (plain-text)", zap.String("listen_addr", listenAddr))
 			if err := srv.Serve(tcpListener); err != nil {
 				s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
 				return
 			}
+		} else {
+			s.shutter.Shutdown(errors.New("invalid server config, server is not plain-text and no TLS config available, something is wrong, this should never happen"))
+			return
 		}
 
 		return
