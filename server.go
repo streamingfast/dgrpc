@@ -410,7 +410,7 @@ func SecuredByBuiltInSelfSignedCertificate() SecureTLSConfig {
 // and **PlainTextServer** option, it's mutually exclusive with them.
 func InsecureServer() ServerOption {
 	return func(options *serverOptions) {
-		options.isPlainText = true
+		options.isPlainText = false
 		options.secureTLSConfig = SecuredByBuiltInSelfSignedCertificate().asTLSConfig()
 	}
 }
