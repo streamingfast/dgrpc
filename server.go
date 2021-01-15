@@ -17,6 +17,8 @@ package dgrpc
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -25,6 +27,8 @@ import (
 	"time"
 
 	"github.com/dfuse-io/dgrpc/insecure"
+	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+	"github.com/dfuse-io/shutter"
 	"github.com/gorilla/mux"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
@@ -55,18 +59,280 @@ import (
 // level.
 var Verbosity = 3
 
+type HealthCheck func(ctx context.Context) (isReady bool, out interface{}, err error)
+
 type serverOptions struct {
 	authCheckerFunc        AuthCheckerFunc
+	healthCheck            HealthCheck
+	healthCheckOver        HealthCheckOver
 	logger                 *zap.Logger
+	isPlainText            bool
 	postUnaryInterceptors  []grpc.UnaryServerInterceptor
 	postStreamInterceptors []grpc.StreamServerInterceptor
+	registers              func(gs *grpc.Server)
+	secureTLSConfig        *tls.Config
 	overrideTraceID        bool
 }
 
 func newServerOptions() *serverOptions {
 	return &serverOptions{
 		logger:          zlog,
+		isPlainText:     true,
 		overrideTraceID: false,
+	}
+}
+
+// Server is actually a thin wrapper struct around an `*http.Server` and a
+// `*grpc.Server` to more easily managed how we deploy our gRPC service.
+//
+// You first create a NewServer2(...) with the various option we provide for
+// how stuff should be wired together. You then `Launch` it and the wrapper
+// takes care of doing the hard code of correctly managing the lifecyle of
+// everything.
+//
+// Here how various options affects the behavior of the `Launch` method.
+// - WithSecure(SecuredByX509KeyPair(..., ...)) => Starts a TLS HTTP2 endpoint to serve the gRPC over an encrypted connection
+// - WithHealthCheck(check, HealthCheckOverHTTP) => Offers an HTTP endpoint `/healthz` to query the health check over HTTP
+//
+type Server struct {
+	shutter    *shutter.Shutter
+	options    *serverOptions
+	grpcServer *grpc.Server
+	httpServer *http.Server
+}
+
+// NewServer2 creates a new thin-wrapper `dgrpc.Server` instance to make it easy
+// to configure and launch a gRPC server that has a well-defined lifecycle tied
+// to `shutter.Shutter` pattern.
+//
+// The server is easily configurable by providing various `dgrpc.ServerOption`
+// options to change the behaviour of the server.
+//
+// This new server is opinionated towards dfuse needs (for example supporting the
+// health check over HTTP) but is generic and configurable enough to used by any
+// organization.
+//
+// Some elements are "hard-coded" but we are willing to open more the configuration
+// if requested by the community.
+//
+// **Important** We use `NewServer2` name temporarly while we test the concept, when
+//               we are statisfied with the interface and feature set, the actual
+//               `NewServer` will be replaced by this implementation.
+func NewServer2(opts ...ServerOption) *Server {
+	options := newServerOptions()
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	server := &Server{
+		shutter:    shutter.New(),
+		options:    options,
+		grpcServer: newGRPCServer(options),
+	}
+
+	if options.healthCheck != nil && HealthCheckOverGRPC.isActive(uint8(options.healthCheckOver)) {
+		pbhealth.RegisterHealthServer(server.grpcServer, server.healthGRPCHandler())
+	}
+
+	return server
+}
+
+// Launch starts all the necessary elements (gRPC Server, HTTP Server if required, etc.) and
+// controls their lifecycle via the internal shutter.
+//
+// This should be called in a Goroutine `go server.Launch("localhost:9000")` and
+// `server.Shutdown()` should be called later on to stop gracefully the server.
+func (s *Server) Launch(listenAddr string) {
+	tcpListener, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		s.shutter.Shutdown(fmt.Errorf("tcp listening to %q: %w", listenAddr, err))
+		return
+	}
+
+	// We start an HTTP server only when having an health check that requires HTTP transport
+	if s.options.healthCheck != nil && HealthCheckOverHTTP.isActive(uint8(s.options.healthCheckOver)) {
+		healthHandler := s.healthHandler()
+		grpcRouter := mux.NewRouter()
+
+		grpcRouter.Path("/").Handler(healthHandler)
+		grpcRouter.Path("/healthz").Handler(healthHandler)
+		grpcRouter.PathPrefix("/").Handler(s.grpcServer)
+
+		errorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
+		if err != nil {
+			s.shutter.Shutdown(fmt.Errorf("unable to create logger: %w", err))
+			return
+		}
+
+		srv := &http.Server{
+			Handler:  grpcRouter,
+			ErrorLog: errorLogger,
+		}
+
+		if s.options.secureTLSConfig == nil {
+			s.logger().Info("serving gRPC (over HTTP router) (encrypted)", zap.String("listen_addr", listenAddr))
+			srv.TLSConfig = s.options.secureTLSConfig
+			if err := srv.ServeTLS(tcpListener, "", ""); err != nil {
+				s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve (TLS) failed: %w", err))
+				return
+			}
+		} else {
+			s.logger().Info("serving gRPC (over HTTP router) (plain-text)", zap.String("listen_addr", listenAddr))
+			if err := srv.Serve(tcpListener); err != nil {
+				s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
+				return
+			}
+		}
+
+		return
+	}
+
+	s.logger().Info("serving gRPC", zap.String("listen_addr", listenAddr))
+	if err := s.grpcServer.Serve(tcpListener); err != nil {
+		s.shutter.Shutdown(fmt.Errorf("gRPC serve failed: %w", err))
+		return
+	}
+
+	return
+}
+
+func (s *Server) healthCheck(ctx context.Context) (isReady bool, out interface{}, err error) {
+	if s.shutter.IsTerminating() {
+		return false, nil, nil
+	}
+
+	check := s.options.healthCheck
+	if check == nil {
+		return false, nil, errors.New("trying to check health while health check is not set, this is invalid")
+	}
+
+	return check(ctx)
+}
+
+func (s *Server) healthGRPCHandler() pbhealth.HealthServer {
+	return healthGRPCHandler{check: s.healthCheck}
+}
+
+type healthGRPCHandler struct {
+	check HealthCheck
+}
+
+func (c healthGRPCHandler) Check(ctx context.Context, _ *pbhealth.HealthCheckRequest) (*pbhealth.HealthCheckResponse, error) {
+	isReady, _, err := c.check(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	status := pbhealth.HealthCheckResponse_NOT_SERVING
+	if isReady {
+		status = pbhealth.HealthCheckResponse_SERVING
+	}
+
+	return &pbhealth.HealthCheckResponse{Status: status}, nil
+}
+
+var readyResponse = map[string]interface{}{"is_ready": true}
+
+func (s *Server) healthHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		isReady, out, err := s.healthCheck(r.Context())
+
+		if !isReady {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+
+		var body interface{}
+		if out != nil && err == nil {
+			body = out
+		} else if err != nil {
+			body = errorResponse{Error: err}
+		} else {
+			body = readyResponse
+		}
+
+		bodyJSON, err := json.Marshal(body)
+		if err != nil {
+			w.Write(bodyJSON)
+		} else {
+			// No reason to failed, but it it's the case, give up
+			bodyJSON, err = json.Marshal(errorResponse{Error: err})
+			if err == nil {
+				w.Write(bodyJSON)
+			}
+		}
+	})
+}
+
+type errorResponse struct {
+	Error error `json:"error"`
+}
+
+func (s *Server) logger() *zap.Logger {
+	return s.options.logger
+}
+
+// RegisterService can be used to register your own gRPC service handler.
+//
+//     server := dgrpc.NewServer2(...)
+//     server.RegisterService(func (gs *grpc.Server) {
+//       pbapi.RegisterStateService(gs, implementation)
+//     })
+//
+// **Note**
+func (s *Server) RegisterService(f func(gs *grpc.Server)) {
+	f(s.grpcServer)
+}
+
+func (s *Server) OnTerminated(f func(err error)) {
+	s.shutter.OnTerminated(f)
+}
+
+func (s *Server) Shutdown(timeout time.Duration) {
+	if s.httpServer != nil {
+		s.shutdownViaHTTP(timeout)
+	} else {
+		s.shutdownViaGRPC(timeout)
+	}
+}
+
+func (s *Server) shutdownViaGRPC(timeout time.Duration) {
+	if s.grpcServer == nil {
+		return
+	}
+
+	stopped := make(chan bool)
+
+	// Stop the server gracefully
+	go func() {
+		s.grpcServer.GracefulStop()
+		close(stopped)
+	}()
+
+	// And don't wait more than 60 seconds for graceful stop to happen
+	select {
+	case <-time.After(timeout):
+		s.logger().Info("gRPC server did not terminate gracefully within allowed time, forcing shutdown")
+		s.grpcServer.Stop()
+	case <-stopped:
+		s.logger().Info("gRPC server teminated gracefully")
+	}
+}
+
+func (s *Server) shutdownViaHTTP(timeout time.Duration) {
+	if s.httpServer == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	err := s.httpServer.Shutdown(ctx)
+	if err != nil {
+		s.logger().Warn("HTTP server did not terminate gracefully within allowed time, forcing shutdown", zap.Error(err))
+	} else {
+		s.logger().Info("HTTP server teminated gracefully")
 	}
 }
 
@@ -76,11 +342,141 @@ type ServerOption func(*serverOptions)
 
 type AuthCheckerFunc func(ctx context.Context, token, ipAddress string) (context.Context, error)
 
+// SecureServer option can be used to flag to use a secured TSL config when starting the
+// server.
+//
+// The config object can be created by one of the various `SecuredBy...` method on this package
+// like `SecuredByX509KeyPair(certFile, keyFile)`.
+//
+// Important: providing this option erases the settings of the counter-part **InsecureServer** option
+// and **PlainTextServer** option, it's mutually exclusive with them.
+func SecureServer(config SecureTLSConfig) ServerOption {
+	return func(options *serverOptions) {
+		options.isPlainText = false
+		options.secureTLSConfig = config.asTLSConfig()
+	}
+}
+
+type SecureTLSConfig interface {
+	asTLSConfig() *tls.Config
+}
+
+type secureTLSConfigWrapper tls.Config
+
+func (c *secureTLSConfigWrapper) asTLSConfig() *tls.Config {
+	return (*tls.Config)(c)
+}
+
+// SecuredByX509KeyPair creates a SecureTLSConfig by loading the provided public/private
+// X509 pair (`.pem` files format).
+func SecuredByX509KeyPair(publicCertFile, privateKeyFile string) (SecureTLSConfig, error) {
+	serverCert, err := tls.LoadX509KeyPair(publicCertFile, privateKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("load X509 key pair files: %w", err)
+	}
+
+	config := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientAuth:   tls.NoClientCert,
+	}
+
+	return (*secureTLSConfigWrapper)(config), nil
+}
+
+// SecuredByBuiltInSelfSignedCertificate creates a SecureTLSConfig that uses the
+// built-in hard-coded certificate found in package `insecure`
+// (path `github.com/dfuse-io/dgrpc/insecure`).
+//
+// This certificate is self-signed and distributed publicly over the internet, so
+// it's not a safe certificate, can be seen as compromised.
+//
+// **Never** uses that in a production environment.
+func SecuredByBuiltInSelfSignedCertificate() SecureTLSConfig {
+	return (*secureTLSConfigWrapper)(&tls.Config{
+		Certificates: []tls.Certificate{insecure.Cert},
+		ClientCAs:    insecure.CertPool,
+		ClientAuth:   tls.VerifyClientCertIfGiven,
+	})
+}
+
+// InsecureServer option can be used to flag to use a TSL config using a built-in self-signed certificate
+// when starting the server which making it exchange in encrypted format but cannot be considered
+// a secure setup.
+//
+// This is a useful tool for development, **never** use it in a production environment. This is
+// equivalent of using the `Secure(SecuredByBuiltInSelfSignedCertificate)` option.
+//
+// Important: providing this option erases the settings of the counter-part **SecureServer** option
+// and **PlainTextServer** option, it's mutually exclusive with them.
+func InsecureServer() ServerOption {
+	return func(options *serverOptions) {
+		options.isPlainText = true
+		options.secureTLSConfig = SecuredByBuiltInSelfSignedCertificate().asTLSConfig()
+	}
+}
+
+// PlainText option can be used to flag to not use a TSL config when starting the
+// server which making it exchanges it's data in **plain-text** format (plain binary is
+// more accurate here).
+//
+// Important: providing this option erases the settings of the counter-part **InsecureServer** option
+// and **SecureServer** option, it's mutually exclusive with them.
+func PlainTextServer() ServerOption {
+	return func(options *serverOptions) {
+		options.isPlainText = true
+		options.secureTLSConfig = nil
+	}
+}
+
 // WithAuthChecker option can be used to pass a function that will be called
 // on connection, validating authentication with 'Authorization: bearer' header
 func WithAuthChecker(authChecker AuthCheckerFunc) ServerOption {
 	return func(options *serverOptions) {
 		options.authCheckerFunc = authChecker
+	}
+}
+
+// HealthCheckOver is a bit field used by the `Server` to decide on what to
+// serve the health check when it's defined.
+type HealthCheckOver uint8
+
+const (
+	// HealthCheckOverHTTP tells the `Server` to serve the health check over an HTTP endpoint (`/healthz` by default)
+	HealthCheckOverHTTP HealthCheckOver = 1 << 0
+
+	// HealthCheckOverGRPC tells the `Server` to serve the health check over the `grpc.health.v1.HealthServer` GRPC service.
+	HealthCheckOverGRPC HealthCheckOver = 1 << 1
+)
+
+func (v HealthCheckOver) isActive(on uint8) bool {
+	return (on & uint8(v)) != 0
+}
+
+// WithHealthCheck option can be used to automatically register an health check function
+// that will be used to determine the health of the server.
+//
+// If HealthCheckOverHTTP is used, the `Launch` method starts an HTTP
+// endpoint '/healthz' to query the `HealthCheck` method provided information.
+// The endpoint returns an `OK 200` if `HealthCheck` returned `isReady == true`, an
+// `Service Unavailable 503` if `isReady == false`.
+//
+// The HTTP response body returned depends on the combination of `out` and
+// and `err` from `HealthCheck` call:
+//
+// - Returns `out` as JSON if `out != nil && err == nil`
+// - Returns `{"error": err.Error()}` JSON if `out == nil && err != nil`
+// - Returns `{"ok": true}` JSON if `out == nil && err == nil`
+//
+// If HealthCheckOverGRPC is used, the `Launch` method registers within the
+// gRPC server a `grpc.health.v1.HealthServer` that uses the `HealthCheck`
+// `isReady` field to returning either `HealthCheckResponse_SERVING` or
+// `HealthCheckResponse_NOT_SERVING`.
+//
+// Both option can be provided at a time with `HealthCheckOverHTTP | HealthCheckOverGRPC`
+func WithHealthCheck(over HealthCheckOver, check HealthCheck) ServerOption {
+	return func(options *serverOptions) {
+		options.healthCheck = check
+		options.healthCheckOver = over
 	}
 }
 
@@ -119,13 +515,30 @@ func OverrideTraceID() ServerOption {
 // NewServer creates a new standard fully configured with tracing, logging and
 // more.
 //
-// **Note** Debugging a gRPC server can be done by using `export GODEBUG=http2debug=2`
+// Deprecated: Use NewGRPCServer version instead, the `NewServer` will return
+//             a `dgrpc.Server` instance in an upcoming version.
 func NewServer(opts ...ServerOption) *grpc.Server {
+	return NewGRPCServer(opts...)
+}
+
+// NewGRPCServer creates a new standard fully configured with tracing, logging and
+// more.
+//
+// **Note** Debugging a gRPC server can be done by using `export GODEBUG=http2debug=2`
+func NewGRPCServer(opts ...ServerOption) *grpc.Server {
 	options := newServerOptions()
 	for _, opt := range opts {
 		opt(options)
 	}
 
+	return newGRPCServer(options)
+}
+
+// NewServer creates a new standard fully configured with tracing, logging and
+// more.
+//
+// **Note** Debugging a gRPC server can be done by using `export GODEBUG=http2debug=2`
+func newGRPCServer(options *serverOptions) *grpc.Server {
 	// GRPC server interceptor that injects in the context the trace_id, if trace_id override option is used it will
 	// simply create a new trace_id
 	unaryTraceID, streamTraceID := setupTracingInterceptors(options.logger, options.overrideTraceID)
@@ -232,8 +645,12 @@ func defaultServerCodeLevel(code codes.Code) zapcore.Level {
 	return grpc_zap.DefaultCodeToLevel(code)
 }
 
+// SimpleHealthCheck creates an HTTP handler that server health check response based on `isDown`.
+//
+// Deprecated: Uses `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
+//             then `go server.Launch()` instead.
 func SimpleHealthCheck(isDown func() bool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		if isDown() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
@@ -242,6 +659,12 @@ func SimpleHealthCheck(isDown func() bool) http.HandlerFunc {
 	}
 }
 
+// SimpleHTTPServer creates an HTTP server that is able to serve gRPC traffic and has an HTTP handler over HTTP
+// if `healthHandler` is specified.
+//
+// Deprecated: Uses `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
+//             then `go server.Launch()` instead. By default opens a plain-text server, if you require an insecure server
+//             like before, use `InsecureServer` option.
 func SimpleHTTPServer(srv *grpc.Server, listenAddr string, healthHandler http.HandlerFunc) *http.Server {
 	router := mux.NewRouter()
 
@@ -273,6 +696,11 @@ func SimpleHTTPServer(srv *grpc.Server, listenAddr string, healthHandler http.Ha
 	return httpSrv
 }
 
+// ListenAndServe open a TCP listener and serve gRPC through it the received HTTP server.
+//
+// Deprecated: Uses `server := dgrpc.NewServer2(options...)` then `go server.Launch()` instead. If you
+//             require HTTP health handler, uses option `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
+//             when configuring your server.
 func ListenAndServe(srv *http.Server) error {
 	listener, err := net.Listen("tcp", srv.Addr)
 	if err != nil {
