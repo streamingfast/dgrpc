@@ -308,10 +308,17 @@ func (s *Server) shutdownViaGRPC(timeout time.Duration) {
 		return
 	}
 
+	if timeout == 0 {
+		s.logger().Info("forcing gRPC server to stop")
+		s.grpcServer.Stop()
+		return
+	}
+
 	stopped := make(chan bool)
 
 	// Stop the server gracefully
 	go func() {
+		s.logger().Info("gracefully stopping the gRPC server", zap.Duration("timeout", timeout))
 		s.grpcServer.GracefulStop()
 		close(stopped)
 	}()
@@ -331,8 +338,16 @@ func (s *Server) shutdownViaHTTP(timeout time.Duration) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	ctx := context.Background()
+	if timeout != 0 {
+		var cancel func()
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+
+		s.logger().Info("forcing HTTP server to stop", zap.Duration("timeout", timeout))
+	} else {
+		s.logger().Info("forcing HTTP server to stop")
+	}
 
 	err := s.httpServer.Shutdown(ctx)
 	if err != nil {
