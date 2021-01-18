@@ -256,13 +256,16 @@ func (s *Server) healthHandler() http.Handler {
 		}
 
 		bodyJSON, err := json.Marshal(body)
-		if err != nil {
+		if err == nil {
 			w.Write(bodyJSON)
 		} else {
-			// No reason to failed, but it it's the case, give up
-			bodyJSON, err = json.Marshal(errorResponse{Error: err})
+			// We were unable to marshal body to JSON, let's actually return the marshalling error now.
+			// There is no reason that the below `json.Marshal` would fail here, but it it's the case, we finally give up.
+			fallbackBodyJSON, err := json.Marshal(map[string]interface{}{
+				"error": fmt.Errorf("unable to marshal health check body (of type %T) to JSON: %w", body, err),
+			})
 			if err == nil {
-				w.Write(bodyJSON)
+				w.Write(fallbackBodyJSON)
 			}
 		}
 	})
