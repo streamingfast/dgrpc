@@ -235,6 +235,7 @@ func (c healthGRPCHandler) Check(ctx context.Context, _ *pbhealth.HealthCheckReq
 }
 
 var readyResponse = map[string]interface{}{"is_ready": true}
+var notReadyResponse = map[string]interface{}{"is_ready": false}
 
 func (s *Server) healthHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -251,8 +252,10 @@ func (s *Server) healthHandler() http.Handler {
 			body = out
 		} else if err != nil {
 			body = errorResponse{Error: err}
-		} else {
+		} else if isReady {
 			body = readyResponse
+		} else {
+			body = notReadyResponse
 		}
 
 		bodyJSON, err := json.Marshal(body)
@@ -344,16 +347,16 @@ func (s *Server) shutdownViaHTTP(timeout time.Duration) {
 		ctx, cancel = context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
-		s.logger().Info("forcing HTTP server to stop", zap.Duration("timeout", timeout))
+		s.logger().Info("gracefully stopping the gRPC server (over HTTP router)", zap.Duration("timeout", timeout))
 	} else {
-		s.logger().Info("forcing HTTP server to stop")
+		s.logger().Info("forcing gRPC server (over HTTP router) to stop")
 	}
 
 	err := s.httpServer.Shutdown(ctx)
 	if err != nil {
-		s.logger().Warn("HTTP server did not terminate gracefully within allowed time, forcing shutdown", zap.Error(err))
+		s.logger().Warn("gRPC server (over HTTP router) did not terminate gracefully within allowed time", zap.Error(err))
 	} else {
-		s.logger().Info("HTTP server teminated gracefully")
+		s.logger().Info("gRPC server (over HTTP router) terminated gracefully")
 	}
 }
 
