@@ -28,8 +28,11 @@ var balancerDialOption = grpc.WithBalancerName(roundrobin.Name)
 var insecureDialOption = grpc.WithInsecure()
 var tracingDialOption = grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
 var tlsClientDialOption = grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, ""))
-var maxCallRecvMsgSize = 1024 * 1024 * 100
-var defaultCallOptions = []grpc.CallOption{grpc.MaxCallRecvMsgSize(maxCallRecvMsgSize), grpc.WaitForReady(true)}
+var maxCallRecvMsgSize = 1024 * 1024 * 1024
+var defaultCallOptions = []grpc.CallOption{
+	grpc.MaxCallRecvMsgSize(maxCallRecvMsgSize),
+	grpc.WaitForReady(true),
+}
 
 var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
 	Time:                30 * time.Second, // send pings every (x seconds) there is no activity
