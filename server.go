@@ -794,7 +794,20 @@ func validateAuth(ctx context.Context, check AuthCheckerFunc) (context.Context, 
 		return ctx, err
 	}
 
-	token := strings.TrimPrefix(authValues[0], "Bearer ")
+	authWords := strings.Split(authValues[0], " ")
+	var token string
+	switch len(authWords) {
+	case 1:
+		token = authWords[0]
+	case 2:
+		if strings.ToLower(authWords[0]) != "bearer" {
+			return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: invalid value for authorization field")
+		}
+		token = authWords[1]
+	default:
+		return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: invalid value for authorization field")
+	}
+
 	ip := extractGRPCRealIP(ctx, md)
 
 	authCtx, err := check(ctx, token, ip)
