@@ -780,34 +780,34 @@ func streamAuthChecker(check AuthCheckerFunc) grpc.StreamServerInterceptor {
 	}
 }
 
-// validateAuth can auth info to the context
+func getAuthToken(md metadata.MD) string {
+	authValues := md["authorization"]
+	if len(authValues) < 1 {
+		return ""
+	}
+
+	for _, authValue := range authValues {
+		authWords := strings.Split(authValue, " ")
+		switch len(authWords) {
+		case 1:
+			return authWords[0]
+		case 2:
+			if strings.ToLower(authWords[0]) == "bearer" {
+				return authWords[1]
+			}
+		}
+	}
+	return ""
+}
+
+// validateAuth can add auth info to the context
 func validateAuth(ctx context.Context, check AuthCheckerFunc) (context.Context, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		err := status.Errorf(codes.Unauthenticated, "unable to authenticate request: missing metadata information, you must provide a valid dfuse API token through gRPC metadata")
-		return ctx, err
+		md = metadata.New(nil)
 	}
 
-	authValues := md["authorization"]
-	if len(authValues) < 1 {
-		err := status.Errorf(codes.Unauthenticated, "unable to authenticate request: missing 'authorization' metadata field, you must provide a valid dfuse API token through gRPC metadata")
-		return ctx, err
-	}
-
-	authWords := strings.Split(authValues[0], " ")
-	var token string
-	switch len(authWords) {
-	case 1:
-		token = authWords[0]
-	case 2:
-		if strings.ToLower(authWords[0]) != "bearer" {
-			return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: invalid value for authorization field")
-		}
-		token = authWords[1]
-	default:
-		return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: invalid value for authorization field")
-	}
-
+	token := getAuthToken(md)
 	ip := extractGRPCRealIP(ctx, md)
 
 	authCtx, err := check(ctx, token, ip)
@@ -839,7 +839,7 @@ func extractGRPCRealIP(ctx context.Context, md metadata.MD) string {
 		// anything that comes in and looks like an IP.
 		//
 		// @see https://cloud.google.com/load-balancing/docs/https#x-forwarded-for_header
-		if len(xForwardedFor) == 2 {
+		if len(xForwardedFor) <= 2 { // 1 or 2
 			return strings.TrimSpace(xForwardedFor[0])
 		}
 
@@ -847,7 +847,7 @@ func extractGRPCRealIP(ctx context.Context, md metadata.MD) string {
 		// considered, all others cannot be trusted (assuming we got `[a, b, c, d]``,
 		// we want to pick element `c` which is at index 2 here so `len(elements) - 2`
 		// gives the correct value)
-		return strings.TrimSpace(xForwardedFor[len(xForwardedFor)-2])
+		return strings.TrimSpace(xForwardedFor[len(xForwardedFor)-2]) // more than 2
 	}
 
 	if peer, ok := peer.FromContext(ctx); ok {
