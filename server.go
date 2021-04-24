@@ -63,6 +63,7 @@ type HealthCheck func(ctx context.Context) (isReady bool, out interface{}, err e
 
 type serverOptions struct {
 	authCheckerFunc        AuthCheckerFunc
+	authCheckerEnforced    bool
 	healthCheck            HealthCheck
 	healthCheckOver        HealthCheckOver
 	logger                 *zap.Logger
@@ -454,9 +455,14 @@ func PlainTextServer() ServerOption {
 
 // WithAuthChecker option can be used to pass a function that will be called
 // on connection, validating authentication with 'Authorization: bearer' header
-func WithAuthChecker(authChecker AuthCheckerFunc) ServerOption {
+//
+// If `enforced` is set to `true`, the token is required and an error is thrown
+// when it's not present. If sets to `false`, it's still extracted from the request
+// metadata and pass to the auth checker function.
+func WithAuthChecker(authChecker AuthCheckerFunc, enforced bool) ServerOption {
 	return func(options *serverOptions) {
 		options.authCheckerFunc = authChecker
+		options.authCheckerEnforced = enforced
 	}
 }
 
@@ -595,8 +601,8 @@ func newGRPCServer(options *serverOptions) *grpc.Server {
 
 	// Authentication is executed here, so the logger that will run after him can extract information from it
 	if options.authCheckerFunc != nil {
-		unaryInterceptors = append(unaryInterceptors, unaryAuthChecker(options.authCheckerFunc))
-		streamInterceptors = append(streamInterceptors, streamAuthChecker(options.authCheckerFunc))
+		unaryInterceptors = append(unaryInterceptors, unaryAuthChecker(options.authCheckerEnforced, options.authCheckerFunc))
+		streamInterceptors = append(streamInterceptors, streamAuthChecker(options.authCheckerEnforced, options.authCheckerFunc))
 	}
 
 	// Adds contextualized logger to interceptors, must comes after authenticator since we extract stuff from there is available.
@@ -758,9 +764,9 @@ func insecureAddr(in string) (out string, insecure bool) {
 	return
 }
 
-func unaryAuthChecker(check AuthCheckerFunc) grpc.UnaryServerInterceptor {
+func unaryAuthChecker(enforced bool, check AuthCheckerFunc) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		childCtx, err := validateAuth(ctx, check)
+		childCtx, err := validateAuth(ctx, enforced, check)
 		if err != nil {
 			return nil, err
 		}
@@ -769,9 +775,9 @@ func unaryAuthChecker(check AuthCheckerFunc) grpc.UnaryServerInterceptor {
 	}
 }
 
-func streamAuthChecker(check AuthCheckerFunc) grpc.StreamServerInterceptor {
+func streamAuthChecker(enforced bool, check AuthCheckerFunc) grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		childCtx, err := validateAuth(ss.Context(), check)
+		childCtx, err := validateAuth(ss.Context(), enforced, check)
 		if err != nil {
 			return err
 		}
@@ -780,37 +786,35 @@ func streamAuthChecker(check AuthCheckerFunc) grpc.StreamServerInterceptor {
 	}
 }
 
-func getAuthToken(md metadata.MD) string {
-	authValues := md["authorization"]
-	if len(authValues) < 1 {
-		return ""
-	}
+var emptyMetadata = metadata.New(nil)
 
-	for _, authValue := range authValues {
-		authWords := strings.Split(authValue, " ")
-		switch len(authWords) {
-		case 1:
-			return authWords[0]
-		case 2:
-			if strings.ToLower(authWords[0]) == "bearer" {
-				return authWords[1]
-			}
-		}
-	}
-	return ""
-}
-
-// validateAuth can add auth info to the context
-func validateAuth(ctx context.Context, check AuthCheckerFunc) (context.Context, error) {
+// validateAuth can auth info to the context
+func validateAuth(ctx context.Context, enforced bool, check AuthCheckerFunc) (context.Context, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		md = metadata.New(nil)
+		md = emptyMetadata
 	}
 
-	token := getAuthToken(md)
-	ip := extractGRPCRealIP(ctx, md)
+	token := ""
+	authValues := md["authorization"]
+	if enforced && len(authValues) <= 0 {
+		return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: missing 'authorization' metadata field, you must provide a valid API token through gRPC metadata")
+	}
 
-	authCtx, err := check(ctx, token, ip)
+	if len(authValues) > 0 {
+		authWords := strings.SplitN(authValues[0], " ", 2)
+		if len(authWords) == 1 {
+			token = authWords[0]
+		} else {
+			if strings.ToLower(authWords[0]) != "bearer" {
+				return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: invalid value for authorization field")
+			}
+
+			token = authWords[1]
+		}
+	}
+
+	authCtx, err := check(ctx, token, extractGRPCRealIP(ctx, md))
 	if err != nil {
 		return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: %s", err)
 	}
