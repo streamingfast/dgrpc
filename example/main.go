@@ -21,7 +21,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dfuse-io/derr"
+	"github.com/streamingfast/derr"
 	"github.com/dfuse-io/dgrpc"
 	pbhealth "github.com/dfuse-io/dgrpc/example/pb/grpc/health/v1"
 	"github.com/dfuse-io/dtracing"
