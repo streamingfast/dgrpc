@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dfuse-io/dgrpc/insecure"
+	"github.com/streamingfast/dgrpc/insecure"
 	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
 	"github.com/streamingfast/shutter"
 	"github.com/gorilla/mux"
@@ -410,7 +410,7 @@ func SecuredByX509KeyPair(publicCertFile, privateKeyFile string) (SecureTLSConfi
 
 // SecuredByBuiltInSelfSignedCertificate creates a SecureTLSConfig that uses the
 // built-in hard-coded certificate found in package `insecure`
-// (path `github.com/dfuse-io/dgrpc/insecure`).
+// (path `github.com/streamingfast/dgrpc/insecure`).
 //
 // This certificate is self-signed and distributed publicly over the internet, so
 // it's not a safe certificate, can be seen as compromised.

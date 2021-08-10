@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/streamingfast/derr"
-	"github.com/dfuse-io/dgrpc"
-	pbhealth "github.com/dfuse-io/dgrpc/example/pb/grpc/health/v1"
+	"github.com/streamingfast/dgrpc"
+	pbhealth "github.com/streamingfast/dgrpc/example/pb/grpc/health/v1"
 	"github.com/streamingfast/dtracing"
 	"github.com/dfuse-io/logging"
 	"go.opencensus.io/trace"
@@ -37,7 +37,7 @@ func setupTracing() {
 var zlog *zap.Logger
 
 func setupLogger() {
-	logging.Register("github.com/dfuse-io/dgrpc/example/", &zlog)
+	logging.Register("github.com/streamingfast/dgrpc/example/", &zlog)
 	logging.Set(logging.MustCreateLoggerWithServiceName("drgpc-example"))
 }
 

@@ -1,4 +1,4 @@
-module github.com/dfuse-io/dgrpc
+module github.com/streamingfast/dgrpc
 
 go 1.13
 

@@ -30,7 +30,7 @@ import (
 var zlog *zap.Logger
 
 func init() {
-	logging.Register("github.com/dfuse-io/dgrpc", &zlog)
+	logging.Register("github.com/streamingfast/dgrpc", &zlog)
 
 	if logger, err := setupGrpcInternalLogger(); err != nil {
 		if zlog != nil {
@@ -39,7 +39,7 @@ func init() {
 			fmt.Fprintf(os.Stderr, "unable to setup internal grpc logger: %s", err)
 		}
 	} else {
-		logging.Register("github.com/dfuse-io/dgrpc/internal_grpc", &logger)
+		logging.Register("github.com/streamingfast/dgrpc/internal_grpc", &logger)
 	}
 }
 

@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dfuse-io/dgrpc"
+	"github.com/streamingfast/dgrpc"
 	"github.com/dfuse-io/logging"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 )
 
-var zlog = logging.NewSimpleLogger("dgrpc", "github.com/dfuse-io/dgrpc_example_secure_server")
+var zlog = logging.NewSimpleLogger("dgrpc", "github.com/streamingfast/dgrpc_example_secure_server")
 
 func ExampleNewServer_Secure() {
 	secureConfig, err := dgrpc.SecuredByX509KeyPair("./example/cert/cert.pem", "./example/cert/key.pem")
