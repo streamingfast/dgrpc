@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dfuse-io/dtracing"
+	"github.com/streamingfast/dtracing"
 	"github.com/stretchr/testify/assert"
 )
 

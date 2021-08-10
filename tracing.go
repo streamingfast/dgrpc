@@ -17,7 +17,7 @@ package dgrpc
 import (
 	"context"
 
-	"github.com/dfuse-io/dtracing"
+	"github.com/streamingfast/dtracing"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.opencensus.io/trace"
