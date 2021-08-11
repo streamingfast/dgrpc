@@ -25,7 +25,7 @@ import (
 	"github.com/streamingfast/dgrpc"
 	pbhealth "github.com/streamingfast/dgrpc/example/pb/grpc/health/v1"
 	"github.com/streamingfast/dtracing"
-	"github.com/dfuse-io/logging"
+	"github.com/streamingfast/logging"
 	"go.opencensus.io/trace"
 	"go.uber.org/zap"
 )

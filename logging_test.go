@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/streamingfast/dtracing"
-	"github.com/dfuse-io/logging"
+	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )

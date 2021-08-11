@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dfuse-io/logging"
+	"github.com/streamingfast/logging"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"go.opencensus.io/trace"
