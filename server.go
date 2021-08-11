@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/dgrpc/insecure"
-	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
 	"github.com/streamingfast/shutter"
 	"github.com/gorilla/mux"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
