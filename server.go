@@ -26,17 +26,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/streamingfast/dgrpc/insecure"
-	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
-	"github.com/streamingfast/shutter"
 	"github.com/gorilla/mux"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/streamingfast/dgrpc/insecure"
+	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
+	"github.com/streamingfast/shutter"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
@@ -144,6 +146,7 @@ func NewServer2(opts ...ServerOption) *Server {
 // This should be called in a Goroutine `go server.Launch("localhost:9000")` and
 // `server.Shutdown()` should be called later on to stop gracefully the server.
 func (s *Server) Launch(listenAddr string) {
+	s.logger().Debug("launching gRPC server", zap.String("listen_addr", listenAddr))
 	tcpListener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		s.shutter.Shutdown(fmt.Errorf("tcp listening to %q: %w", listenAddr, err))
@@ -179,6 +182,10 @@ func (s *Server) Launch(listenAddr string) {
 			}
 		} else if s.options.isPlainText {
 			s.logger().Info("serving gRPC (over HTTP router) (plain-text)", zap.String("listen_addr", listenAddr))
+
+			h2s := &http2.Server{}
+			s.httpServer.Handler = h2c.NewHandler(grpcRouter, h2s)
+
 			if err := s.httpServer.Serve(tcpListener); err != nil {
 				s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
 				return
@@ -196,8 +203,6 @@ func (s *Server) Launch(listenAddr string) {
 		s.shutter.Shutdown(fmt.Errorf("gRPC serve failed: %w", err))
 		return
 	}
-
-	return
 }
 
 func (s *Server) healthCheck(ctx context.Context) (isReady bool, out interface{}, err error) {

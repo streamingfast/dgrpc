@@ -1,7 +1,6 @@
 package dgrpc_test
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -12,19 +11,14 @@ import (
 )
 
 func init() {
-	logging.ApplicationLogger("example", "github.com/streamingfast/dgrpc_example_secure_server", &zlog)
+	logging.ApplicationLogger("example", "github.com/streamingfast/dgrpc_example_plain_text_server", &zlog)
 }
 
-func ExampleNewServer_Secure() {
-	secureConfig, err := dgrpc.SecuredByX509KeyPair("./example/cert/cert.pem", "./example/cert/key.pem")
-	if err != nil {
-		panic(fmt.Errorf("unable to create X509 secure config: %w", err))
-	}
-
+func ExampleNewServer_PlainText() {
 	server := dgrpc.NewServer2(
-		dgrpc.SecureServer(secureConfig),
+		dgrpc.PlainTextServer(),
 		dgrpc.WithLogger(zlog),
-		dgrpc.WithHealthCheck(dgrpc.HealthCheckOverGRPC, healthCheck),
+		dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP|dgrpc.HealthCheckOverGRPC, healthCheck),
 	)
 
 	server.RegisterService(func(gs *grpc.Server) {
