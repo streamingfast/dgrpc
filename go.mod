@@ -10,7 +10,7 @@ require (
 	github.com/streamingfast/derr v0.0.0-20210811180100-9138d738bcec
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a
 	github.com/streamingfast/logging v0.0.0-20210811175431-f3b44b61606a
-	github.com/streamingfast/pbgo v0.0.6-0.20211029044348-267c903ccb21
+	github.com/streamingfast/pbgo v0.0.6-0.20211209212750-753f0acb6553
 	github.com/streamingfast/shutter v1.5.0
 	github.com/stretchr/testify v1.4.0
 	go.opencensus.io v0.22.2
