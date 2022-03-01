@@ -32,7 +32,6 @@ import (
 	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/streamingfast/dgrpc/insecure"
-	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
 	"github.com/streamingfast/shutter"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.uber.org/zap"
@@ -41,6 +40,7 @@ import (
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
@@ -227,17 +227,49 @@ type healthGRPCHandler struct {
 }
 
 func (c healthGRPCHandler) Check(ctx context.Context, _ *pbhealth.HealthCheckRequest) (*pbhealth.HealthCheckResponse, error) {
-	isReady, _, err := c.check(ctx)
+	status, err := c.healthStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	status := pbhealth.HealthCheckResponse_NOT_SERVING
-	if isReady {
-		status = pbhealth.HealthCheckResponse_SERVING
+	return &pbhealth.HealthCheckResponse{Status: status}, nil
+}
+
+func (c healthGRPCHandler) Watch(req *pbhealth.HealthCheckRequest, stream pbhealth.Health_WatchServer) error {
+	currentStatus := pbhealth.HealthCheckResponse_SERVICE_UNKNOWN
+	waitTime := 0 * time.Second
+
+	for {
+		select {
+		case <-stream.Context().Done():
+			return nil
+		case <-time.After(waitTime):
+			newStatus, _ := c.healthStatus(stream.Context())
+			waitTime = 5 * time.Second
+
+			if newStatus != currentStatus {
+				currentStatus = newStatus
+
+				if err := stream.Send(&pbhealth.HealthCheckResponse{Status: currentStatus}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+}
+
+func (c healthGRPCHandler) healthStatus(ctx context.Context) (pbhealth.HealthCheckResponse_ServingStatus, error) {
+	isReady, _, err := c.check(ctx)
+
+	if err != nil {
+		return pbhealth.HealthCheckResponse_SERVICE_UNKNOWN, err
 	}
 
-	return &pbhealth.HealthCheckResponse{Status: status}, nil
+	if isReady {
+		return pbhealth.HealthCheckResponse_SERVING, nil
+	}
+
+	return pbhealth.HealthCheckResponse_NOT_SERVING, nil
 }
 
 var readyResponse = map[string]interface{}{"is_ready": true}

@@ -1,6 +1,7 @@
-package dgrpc_test
+package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -11,11 +12,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-func init() {
-	logging.ApplicationLogger("example", "github.com/streamingfast/dgrpc_example_secure_server", &zlog)
-}
+var zlog, _ = logging.ApplicationLogger("example", "github.com/streamingfast/dgrpc/examples/secure-server")
 
-func ExampleNewServer_Secure() {
+func main() {
 	secureConfig, err := dgrpc.SecuredByX509KeyPair("./example/cert/cert.pem", "./example/cert/key.pem")
 	if err != nil {
 		panic(fmt.Errorf("unable to create X509 secure config: %w", err))
@@ -49,4 +48,18 @@ func ExampleNewServer_Secure() {
 
 	// Gives 30s for a gracefull shutdown
 	server.Shutdown(30 * time.Second)
+}
+
+func healthCheck(ctx context.Context) (isReady bool, out interface{}, err error) {
+	// In your own code, you should tied the `isReady` value to the lifecycle of your application.
+	// If your application is ready to accept requests, return `true`, otherwise return `false`.
+	//
+	// The `out` value that can anything is used by the HTTP health check (if configured in the `WithHealthCheck`
+	// option by using for example `dgrpc.HealthCheckOverGRPC | dgrpc.HealthCheckOverHTTP`) will be serialized
+	// in the body as JSON. It is **not** used by the GRPC health check because there is no such notion of
+	// return payload.
+	//
+	// An error should be returned only in really rare cases, most of the time if there is an error it means
+	// your application is not ready to accept requests.
+	return true, nil, nil
 }

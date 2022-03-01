@@ -40,8 +40,10 @@ var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
 	PermitWithoutStream: true,             // send pings even without active streams
 })
 
-// NewInternalClient creates a grpc ClientConn with keepalive, tracing and *insecure TLS*
-// debug me using `export GODEBUG=http2debug=2`
+// NewInternalClient creates a grpc ClientConn with keep alive, tracing and plain text
+// connection (so no TLS involved, the server must also listen to a plain text socket).
+//
+// It's possible to debug low-level message using `export GODEBUG=http2debug=2`.
 func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(
 		remoteAddr,
