@@ -16,54 +16,22 @@ package dgrpc
 
 import (
 	"context"
-	"fmt"
-	"os"
 
-	"github.com/streamingfast/logging"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
+	"github.com/streamingfast/logging"
 	"go.opencensus.io/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
-var zlog *zap.Logger
+var zlog, _ = logging.PackageLogger("dgrpc", "github.com/streamingfast/dgrpc")
+var zlogGRPC, _ = logging.PackageLogger("dgrpc", "github.com/streamingfast/dgrpc/internal_grpc")
 
 func init() {
-	logging.Register("github.com/streamingfast/dgrpc", &zlog)
-
-	if logger, err := setupGrpcInternalLogger(); err != nil {
-		if zlog != nil {
-			zlog.Warn("unable to setup internal grpc logger", zap.Error(err))
-		} else {
-			fmt.Fprintf(os.Stderr, "unable to setup internal grpc logger: %s", err)
-		}
-	} else {
-		logging.Register("github.com/streamingfast/dgrpc/internal_grpc", &logger)
-	}
-}
-
-func setupGrpcInternalLogger(opts ...zap.Option) (*zap.Logger, error) {
-	grpcAtomicLevel := zap.NewAtomicLevelAt(zap.ErrorLevel)
-	grpcUserSpecifiedLevel := os.Getenv("GRPC_GO_ZAP_LEVEL")
-	if grpcUserSpecifiedLevel != "" {
-		err := grpcAtomicLevel.UnmarshalText([]byte(grpcUserSpecifiedLevel))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	config := logging.BasicLoggingConfig("internal_grpc", grpcAtomicLevel, opts...)
-
-	grpcInternalZlog, err := config.Build(opts...)
-	if err != nil {
-		return nil, err
-	}
-
 	// Level 0 verbosity in grpc-go less chatty
 	// https://github.com/grpc/grpc-go/blob/master/Documentation/log_levels.md
-	grpc_zap.ReplaceGrpcLoggerV2(grpcInternalZlog)
-	return grpcInternalZlog, nil
+	grpc_zap.ReplaceGrpcLoggerV2(zlogGRPC)
 }
 
 func setupLoggingInterceptors(logger *zap.Logger) (grpc.UnaryServerInterceptor, grpc.StreamServerInterceptor) {

@@ -260,7 +260,6 @@ func (c healthGRPCHandler) Watch(req *pbhealth.HealthCheckRequest, stream pbheal
 
 func (c healthGRPCHandler) healthStatus(ctx context.Context) (pbhealth.HealthCheckResponse_ServingStatus, error) {
 	isReady, _, err := c.check(ctx)
-
 	if err != nil {
 		return pbhealth.HealthCheckResponse_SERVICE_UNKNOWN, err
 	}
@@ -601,7 +600,7 @@ func NewGRPCServer(opts ...ServerOption) *grpc.Server {
 	return newGRPCServer(options)
 }
 
-// NewServer creates a new standard fully configured with tracing, logging and
+// newGRPCServer creates a new standard fully configured with tracing, logging and
 // more.
 //
 // **Note** Debugging a gRPC server can be done by using `export GODEBUG=http2debug=2`
@@ -687,6 +686,7 @@ func defaultLoggingDecider(fullMethodName string, err error) bool {
 	if err == nil && fullMethodName == "/grpc.health.v1.Health/Check" {
 		return false
 	}
+
 	return true
 }
 
