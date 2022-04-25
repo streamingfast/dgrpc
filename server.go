@@ -72,7 +72,7 @@ type serverOptions struct {
 	isPlainText            bool
 	postUnaryInterceptors  []grpc.UnaryServerInterceptor
 	postStreamInterceptors []grpc.StreamServerInterceptor
-	registers              func(gs *grpc.Server)
+	registrator            func(gs *grpc.Server)
 	secureTLSConfig        *tls.Config
 	overrideTraceID        bool
 }
@@ -135,6 +135,10 @@ func NewServer2(opts ...ServerOption) *Server {
 
 	if options.healthCheck != nil && HealthCheckOverGRPC.isActive(uint8(options.healthCheckOver)) {
 		pbhealth.RegisterHealthServer(server.grpcServer, server.healthGRPCHandler())
+	}
+
+	if options.registrator != nil {
+		options.registrator(server.grpcServer)
 	}
 
 	return server
@@ -554,6 +558,14 @@ func WithLogger(logger *zap.Logger) ServerOption {
 	}
 }
 
+// WithRegisterService option can be used to register the different gRPC
+// services that this server is going to support.
+func WithRegisterService(registrator func(gs *grpc.Server)) ServerOption {
+	return func(options *serverOptions) {
+		options.registrator = registrator
+	}
+}
+
 // WithPostUnaryInterceptor option can be used to add your own `grpc.UnaryServerInterceptor`
 // after all others defined automatically by the package.
 func WithPostUnaryInterceptor(interceptor grpc.UnaryServerInterceptor) ServerOption {
@@ -714,7 +726,7 @@ func defaultServerCodeLevel(code codes.Code) zapcore.Level {
 
 // SimpleHealthCheck creates an HTTP handler that server health check response based on `isDown`.
 //
-// Deprecated: Uses `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
+// Deprecated: Use `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
 //             then `go server.Launch()` instead.
 func SimpleHealthCheck(isDown func() bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
@@ -729,7 +741,7 @@ func SimpleHealthCheck(isDown func() bool) http.HandlerFunc {
 // SimpleHTTPServer creates an HTTP server that is able to serve gRPC traffic and has an HTTP handler over HTTP
 // if `healthHandler` is specified.
 //
-// Deprecated: Uses `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
+// Deprecated: Use `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
 //             then `go server.Launch()` instead. By default opens a plain-text server, if you require an insecure server
 //             like before, use `InsecureServer` option.
 func SimpleHTTPServer(srv *grpc.Server, listenAddr string, healthHandler http.HandlerFunc) *http.Server {
@@ -765,7 +777,7 @@ func SimpleHTTPServer(srv *grpc.Server, listenAddr string, healthHandler http.Ha
 
 // ListenAndServe open a TCP listener and serve gRPC through it the received HTTP server.
 //
-// Deprecated: Uses `server := dgrpc.NewServer2(options...)` then `go server.Launch()` instead. If you
+// Deprecated: Use `server := dgrpc.NewServer2(options...)` then `go server.Launch()` instead. If you
 //             require HTTP health handler, uses option `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
 //             when configuring your server.
 func ListenAndServe(srv *http.Server) error {

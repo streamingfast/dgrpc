@@ -18,12 +18,11 @@ func main() {
 		dgrpc.PlainTextServer(),
 		dgrpc.WithLogger(zlog),
 		dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP|dgrpc.HealthCheckOverGRPC, healthCheck),
+		dgrpc.WithRegisterService(func(gs *grpc.Server) {
+			// Register some more gRPC services here against `gs`
+			// pbstatedb.RegisterStateService(gs, implementation)
+		}),
 	)
-
-	server.RegisterService(func(gs *grpc.Server) {
-		// Register some more gRPC services here against `gs`
-		// pbstatedb.RegisterStateService(gs, implementation)
-	})
 
 	server.OnTerminated(func(err error) {
 		if err != nil {
