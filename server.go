@@ -678,8 +678,8 @@ func newGRPCServer(options *serverOptions) *grpc.Server {
 		),
 		grpc.KeepaliveParams(
 			keepalive.ServerParameters{
-				Time:    30 * time.Second, // Ping the client if it is idle for this amount of time
-				Timeout: 10 * time.Second, // Wait this amount of time after the ping before assuming connection is dead
+				Time:    300 * time.Second, // Ping the client if it is idle for this amount of time
+				Timeout: 620 * time.Second, // Wait this amount of time after the ping before assuming connection is dead
 			},
 		),
 		grpc_middleware.WithStreamServerChain(streamInterceptors...),
