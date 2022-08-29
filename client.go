@@ -26,9 +26,8 @@ import (
 // var balancerDialOption = grpc.WithBalancerName(roundrobin.Name)
 var cfg = `
 {
-  load_balancing_config: { round_robin: {} }
-}
-`
+  "load_balancing_config": { "round_robin": {} }
+}`
 var serviceCongfig = grpc.WithDefaultServiceConfig(cfg)
 
 var insecureDialOption = grpc.WithInsecure()
