@@ -19,12 +19,18 @@ import (
 
 	"go.opencensus.io/plugin/ocgrpc"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/balancer/roundrobin"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 )
 
-var balancerDialOption = grpc.WithBalancerName(roundrobin.Name)
+// var balancerDialOption = grpc.WithBalancerName(roundrobin.Name)
+var cfg = `
+{
+  load_balancing_config: { round_robin: {} }
+}
+`
+var serviceCongfig = grpc.WithDefaultServiceConfig(cfg)
+
 var insecureDialOption = grpc.WithInsecure()
 var tracingDialOption = grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
 var tlsClientDialOption = grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, ""))
@@ -48,7 +54,7 @@ func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(
 		remoteAddr,
 		tracingDialOption,
-		balancerDialOption,
+		serviceCongfig,
 		insecureDialOption,
 		keepaliveDialOption,
 		grpc.WithDefaultCallOptions(defaultCallOptions...),
@@ -60,7 +66,7 @@ func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 func NewExternalClient(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{
 		tracingDialOption,
-		balancerDialOption,
+		serviceCongfig,
 		keepaliveDialOption,
 		tlsClientDialOption,
 		grpc.WithDefaultCallOptions(defaultCallOptions...),
