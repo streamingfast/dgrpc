@@ -28,7 +28,7 @@ var cfg = `
 {
   "load_balancing_config": { "round_robin": {} }
 }`
-var serviceCongfig = grpc.WithDefaultServiceConfig(cfg)
+var serviceConfig = grpc.WithDefaultServiceConfig(cfg)
 
 var insecureDialOption = grpc.WithInsecure()
 var tracingDialOption = grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
@@ -53,7 +53,7 @@ func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(
 		remoteAddr,
 		tracingDialOption,
-		serviceCongfig,
+		serviceConfig,
 		insecureDialOption,
 		keepaliveDialOption,
 		grpc.WithDefaultCallOptions(defaultCallOptions...),
@@ -65,7 +65,7 @@ func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 func NewExternalClient(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{
 		tracingDialOption,
-		serviceCongfig,
+		serviceConfig,
 		keepaliveDialOption,
 		tlsClientDialOption,
 		grpc.WithDefaultCallOptions(defaultCallOptions...),

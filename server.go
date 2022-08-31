@@ -45,7 +45,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 )
 
 // Verbosity is configuration that can be used to globally reduce
@@ -96,7 +95,6 @@ func newServerOptions() *serverOptions {
 // Here how various options affects the behavior of the `Launch` method.
 // - WithSecure(SecuredByX509KeyPair(..., ...)) => Starts a TLS HTTP2 endpoint to serve the gRPC over an encrypted connection
 // - WithHealthCheck(check, HealthCheckOverHTTP) => Offers an HTTP endpoint `/healthz` to query the health check over HTTP
-//
 type Server struct {
 	shutter    *shutter.Shutter
 	options    *serverOptions
@@ -119,8 +117,9 @@ type Server struct {
 // if requested by the community.
 //
 // **Important** We use `NewServer2` name temporarly while we test the concept, when
-//               we are statisfied with the interface and feature set, the actual
-//               `NewServer` will be replaced by this implementation.
+//
+//	we are statisfied with the interface and feature set, the actual
+//	`NewServer` will be replaced by this implementation.
 func NewServer2(opts ...ServerOption) *Server {
 	options := newServerOptions()
 	for _, opt := range opts {
@@ -325,10 +324,10 @@ func (s *Server) logger() *zap.Logger {
 
 // RegisterService can be used to register your own gRPC service handler.
 //
-//     server := dgrpc.NewServer2(...)
-//     server.RegisterService(func (gs *grpc.Server) {
-//       pbapi.RegisterStateService(gs, implementation)
-//     })
+//	server := dgrpc.NewServer2(...)
+//	server.RegisterService(func (gs *grpc.Server) {
+//	  pbapi.RegisterStateService(gs, implementation)
+//	})
 //
 // **Note**
 func (s *Server) RegisterService(f func(gs *grpc.Server)) {
@@ -404,8 +403,6 @@ func (s *Server) shutdownViaHTTP(timeout time.Duration) {
 // ServerOption represents option that can be used when constructing a gRPC
 // server to customize its behavior.
 type ServerOption func(*serverOptions)
-
-type AuthCheckerFunc func(ctx context.Context, token, ipAddress string) (context.Context, error)
 
 // SecureServer option can be used to flag to use a secured TSL config when starting the
 // server.
@@ -594,7 +591,8 @@ func OverrideTraceID() ServerOption {
 // more.
 //
 // Deprecated: Use NewGRPCServer version instead, the `NewServer` will return
-//             a `dgrpc.Server` instance in an upcoming version.
+//
+//	a `dgrpc.Server` instance in an upcoming version.
 func NewServer(opts ...ServerOption) *grpc.Server {
 	return NewGRPCServer(opts...)
 }
@@ -649,8 +647,8 @@ func newGRPCServer(options *serverOptions) *grpc.Server {
 
 	// Authentication is executed here, so the logger that will run after him can extract information from it
 	if options.authCheckerFunc != nil {
-		unaryInterceptors = append(unaryInterceptors, unaryAuthChecker(options.authCheckerEnforced, options.authCheckerFunc))
-		streamInterceptors = append(streamInterceptors, streamAuthChecker(options.authCheckerEnforced, options.authCheckerFunc))
+		unaryInterceptors = append(unaryInterceptors, UnaryAuthChecker(options.authCheckerEnforced, options.authCheckerFunc))
+		streamInterceptors = append(streamInterceptors, StreamAuthChecker(options.authCheckerEnforced, options.authCheckerFunc))
 	}
 
 	// Adds contextualized logger to interceptors, must comes after authenticator since we extract stuff from there is available.
@@ -727,7 +725,8 @@ func defaultServerCodeLevel(code codes.Code) zapcore.Level {
 // SimpleHealthCheck creates an HTTP handler that server health check response based on `isDown`.
 //
 // Deprecated: Use `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
-//             then `go server.Launch()` instead.
+//
+//	then `go server.Launch()` instead.
 func SimpleHealthCheck(isDown func() bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		if isDown() {
@@ -742,8 +741,9 @@ func SimpleHealthCheck(isDown func() bool) http.HandlerFunc {
 // if `healthHandler` is specified.
 //
 // Deprecated: Use `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
-//             then `go server.Launch()` instead. By default opens a plain-text server, if you require an insecure server
-//             like before, use `InsecureServer` option.
+//
+//	then `go server.Launch()` instead. By default opens a plain-text server, if you require an insecure server
+//	like before, use `InsecureServer` option.
 func SimpleHTTPServer(srv *grpc.Server, listenAddr string, healthHandler http.HandlerFunc) *http.Server {
 	router := mux.NewRouter()
 
@@ -778,8 +778,9 @@ func SimpleHTTPServer(srv *grpc.Server, listenAddr string, healthHandler http.Ha
 // ListenAndServe open a TCP listener and serve gRPC through it the received HTTP server.
 //
 // Deprecated: Use `server := dgrpc.NewServer2(options...)` then `go server.Launch()` instead. If you
-//             require HTTP health handler, uses option `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
-//             when configuring your server.
+//
+//	require HTTP health handler, uses option `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)`
+//	when configuring your server.
 func ListenAndServe(srv *http.Server) error {
 	listener, err := net.Listen("tcp", srv.Addr)
 	if err != nil {
@@ -813,63 +814,7 @@ func insecureAddr(in string) (out string, insecure bool) {
 	return
 }
 
-func unaryAuthChecker(enforced bool, check AuthCheckerFunc) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		childCtx, err := validateAuth(ctx, enforced, check)
-		if err != nil {
-			return nil, err
-		}
-
-		return handler(childCtx, req)
-	}
-}
-
-func streamAuthChecker(enforced bool, check AuthCheckerFunc) grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		childCtx, err := validateAuth(ss.Context(), enforced, check)
-		if err != nil {
-			return err
-		}
-
-		return handler(srv, authenticatedServerStream{ServerStream: ss, authenticatedContext: childCtx})
-	}
-}
-
 var emptyMetadata = metadata.New(nil)
-
-// validateAuth can auth info to the context
-func validateAuth(ctx context.Context, enforced bool, check AuthCheckerFunc) (context.Context, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		md = emptyMetadata
-	}
-
-	token := ""
-	authValues := md["authorization"]
-	if enforced && len(authValues) <= 0 {
-		return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: missing 'authorization' metadata field, you must provide a valid API token through gRPC metadata")
-	}
-
-	if len(authValues) > 0 {
-		authWords := strings.SplitN(authValues[0], " ", 2)
-		if len(authWords) == 1 {
-			token = authWords[0]
-		} else {
-			if strings.ToLower(authWords[0]) != "bearer" {
-				return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: invalid value for authorization field")
-			}
-
-			token = authWords[1]
-		}
-	}
-
-	authCtx, err := check(ctx, token, extractGRPCRealIP(ctx, md))
-	if err != nil {
-		return ctx, status.Errorf(codes.Unauthenticated, "unable to authenticate request: %s", err)
-	}
-
-	return authCtx, err
-}
 
 var portSuffixRegex = regexp.MustCompile(`:[0-9]{2,5}$`)
 
