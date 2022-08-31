@@ -3,6 +3,7 @@ module github.com/streamingfast/dgrpc
 go 1.15
 
 require (
+	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
