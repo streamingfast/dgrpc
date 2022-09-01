@@ -31,7 +31,7 @@ type configInput struct {
 	configMesh             string
 }
 
-func GenerateBootstrapFile(xdsServerUri string, outputFilePath string) error {
+func GenerateBootstrapFile(xdsServerUri string, vpcNetworkName string, outputFilePath string) error {
 	gcpProjectNumber, err := getProjectId()
 	if err != nil {
 		return fmt.Errorf("could not discover GCP project number: %w", err)
@@ -74,8 +74,7 @@ func GenerateBootstrapFile(xdsServerUri string, outputFilePath string) error {
 	input := configInput{
 		xdsServerUri:           xdsServerUri,
 		gcpProjectNumber:       gcpProjectNumber,
-		vpcNetworkName:         "default",
-		ip:                     ip,
+		ip:                     vpcNetworkName,
 		zone:                   zone,
 		ignoreResourceDeletion: false,
 		includeV3Features:      true,
