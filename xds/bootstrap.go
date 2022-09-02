@@ -32,6 +32,14 @@ type configInput struct {
 }
 
 func GenerateBootstrapFile(xdsServerUri string, vpcNetworkName string, outputFilePath string) error {
+	if xdsServerUri == "" {
+		return fmt.Errorf("xdsServerUri must be set")
+	}
+
+	if vpcNetworkName == "" {
+		return fmt.Errorf("vpcNetworkName must be set")
+	}
+
 	gcpProjectNumber, err := getProjectId()
 	if err != nil {
 		return fmt.Errorf("could not discover GCP project number: %w", err)
@@ -74,7 +82,8 @@ func GenerateBootstrapFile(xdsServerUri string, vpcNetworkName string, outputFil
 	input := configInput{
 		xdsServerUri:           xdsServerUri,
 		gcpProjectNumber:       gcpProjectNumber,
-		ip:                     vpcNetworkName,
+		vpcNetworkName:         vpcNetworkName,
+		ip:                     ip,
 		zone:                   zone,
 		ignoreResourceDeletion: false,
 		includeV3Features:      true,
