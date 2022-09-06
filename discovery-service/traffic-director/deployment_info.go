@@ -1,4 +1,4 @@
-package dgrpcxds
+package trafficdirector
 
 import (
 	"net/http"

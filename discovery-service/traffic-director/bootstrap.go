@@ -1,10 +1,9 @@
-package dgrpcxds
+package trafficdirector
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -14,6 +13,9 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type configInput struct {
@@ -31,7 +33,29 @@ type configInput struct {
 	configMesh             string
 }
 
-func GenerateBootstrapFile(xdsServerUri string, vpcNetworkName string, outputFilePath string) error {
+func Bootstrap(u *url.URL) error {
+	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
+	zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))
+
+	if bootStrapFilename != "" {
+		return fmt.Errorf("GRPC_XDS_BOOTSTRAP environment var must be set when using traffic director")
+	}
+
+	vpcNetworkName := u.Query().Get("vpc_network")
+	if vpcNetworkName == "" {
+		return fmt.Errorf("vpc_network must be set when bootstraping traffic director")
+	}
+
+	zlog.Info("generating bootstrap file", zap.String("filename", bootStrapFilename))
+	err := generateBootstrapFile("trafficdirector.googleapis.com:443", vpcNetworkName, bootStrapFilename)
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate bootstrap file: %v", err))
+	}
+
+	return nil
+}
+
+func generateBootstrapFile(xdsServerUri string, vpcNetworkName string, outputFilePath string) error {
 	if xdsServerUri == "" {
 		return fmt.Errorf("xdsServerUri must be set")
 	}

@@ -1,8 +1,14 @@
-package dgrpcxds
+package trafficdirector
 
 import (
 	"crypto/tls"
 	"fmt"
+	"log"
+	"net"
+	"net/url"
+	"strings"
+	"time"
+
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/shutter"
@@ -15,9 +21,6 @@ import (
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/xds"
-	"log"
-	"net"
-	"time"
 )
 
 type ServerOption func(*serverOptions)
@@ -67,7 +70,7 @@ type Server struct {
 	logger       *zap.Logger
 }
 
-func NewServer(useXDSCreds bool, logger *zap.Logger, opts ...ServerOption) *Server {
+func NewServer(u *url.URL, logger *zap.Logger, opts ...ServerOption) *Server {
 	options := newServerOptions(logger)
 	for _, opt := range opts {
 		opt(options)
@@ -77,6 +80,8 @@ func NewServer(useXDSCreds bool, logger *zap.Logger, opts ...ServerOption) *Serv
 		options.unaryInterceptors = append(options.unaryInterceptors, dgrpc.UnaryAuthChecker(options.authCheckerEnforced, options.authCheckerFunc))
 		options.streamInterceptors = append(options.streamInterceptors, dgrpc.StreamAuthChecker(options.authCheckerEnforced, options.authCheckerFunc))
 	}
+
+	useXDSCreds := strings.ToUpper(u.Query().Get("use-xds-reds")) == "TRUE"
 
 	creds := insecure.NewCredentials()
 	if useXDSCreds {
