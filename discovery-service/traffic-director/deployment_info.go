@@ -1,4 +1,4 @@
-package trafficdirector
+package traffic_director
 
 import (
 	"net/http"
