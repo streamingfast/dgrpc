@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dgrpc
+package standard
 
 import (
 	"context"
@@ -34,7 +34,7 @@ func init() {
 	grpc_zap.ReplaceGrpcLoggerV2(zlogGRPC)
 }
 
-func setupLoggingInterceptors(logger *zap.Logger) (grpc.UnaryServerInterceptor, grpc.StreamServerInterceptor) {
+func SetupLoggingInterceptors(logger *zap.Logger) (grpc.UnaryServerInterceptor, grpc.StreamServerInterceptor) {
 	unaryServerInterceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		return handler(withLogger(ctx, logger), req)
 	}

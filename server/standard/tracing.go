@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dgrpc
+package standard
 
 import (
 	"context"
 
-	"github.com/streamingfast/dtracing"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"github.com/streamingfast/dtracing"
 	"go.opencensus.io/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
-func setupTracingInterceptors(logger *zap.Logger, overrideTraceID bool) (grpc.UnaryServerInterceptor, grpc.StreamServerInterceptor) {
+func SetupTracingInterceptors(logger *zap.Logger, overrideTraceID bool) (grpc.UnaryServerInterceptor, grpc.StreamServerInterceptor) {
 	unaryServerInterceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// In GRPC unary calls we do not want to override the trace id of the load balancer
 		return handler(withTraceID(ctx, logger, overrideTraceID), req)

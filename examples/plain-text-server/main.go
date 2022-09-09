@@ -5,7 +5,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/streamingfast/dgrpc"
+	"github.com/streamingfast/dgrpc/server/factory"
+
+	"github.com/streamingfast/dgrpc/server"
+
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -14,11 +17,11 @@ import (
 var zlog, _ = logging.ApplicationLogger("example", "github.com/streamingfast/dgrpc/examples/plain-text-server")
 
 func main() {
-	server := dgrpc.NewServer2(
-		dgrpc.PlainTextServer(),
-		dgrpc.WithLogger(zlog),
-		dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP|dgrpc.HealthCheckOverGRPC, healthCheck),
-		dgrpc.WithRegisterService(func(gs *grpc.Server) {
+	server := factory.ServerFromOptions(
+		server.WithPlainTextServer(),
+		server.WithLogger(zlog),
+		server.WithHealthCheck(server.HealthCheckOverHTTP|server.HealthCheckOverGRPC, healthCheck),
+		server.WithRegisterService(func(gs *grpc.Server) {
 			// Register some more gRPC services here against `gs`
 			// pbstatedb.RegisterStateService(gs, implementation)
 		}),

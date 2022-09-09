@@ -12,27 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dgrpc
+package standard
 
 import (
 	"context"
 	"testing"
 
 	"github.com/streamingfast/dtracing"
+	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
-func Test_withTraceId(t *testing.T) {
+func Test_withLogger(t *testing.T) {
 
 	var tests = []struct {
 		name              string
-		overrideTraceID   bool
+		overrideTraceId   bool
 		contextFunc       func() context.Context
 		expectTraceIddiff bool
 	}{
 		{
 			name:            "Context without trace id",
-			overrideTraceID: true,
+			overrideTraceId: true,
 			contextFunc: func() context.Context {
 				return context.Background()
 			},
@@ -40,7 +42,7 @@ func Test_withTraceId(t *testing.T) {
 		},
 		{
 			name:            "with override trace id, context with trace id ",
-			overrideTraceID: true,
+			overrideTraceId: true,
 			contextFunc: func() context.Context {
 				ctx, _ := dtracing.StartFreshSpan(context.Background(), "Testing")
 				return ctx
@@ -49,7 +51,7 @@ func Test_withTraceId(t *testing.T) {
 		},
 		{
 			name:            "without override trace id, context without trace id",
-			overrideTraceID: false,
+			overrideTraceId: false,
 			contextFunc: func() context.Context {
 				return context.Background()
 			},
@@ -57,7 +59,7 @@ func Test_withTraceId(t *testing.T) {
 		},
 		{
 			name:            "without override trace id, context with trace id ",
-			overrideTraceID: false,
+			overrideTraceId: false,
 			contextFunc: func() context.Context {
 				ctx, _ := dtracing.StartFreshSpan(context.Background(), "Testing")
 				return ctx
@@ -68,16 +70,12 @@ func Test_withTraceId(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			inputCtx := test.contextFunc()
-			outputCtx := withTraceID(inputCtx, zlog, test.overrideTraceID)
+			inputLogger := zap.NewNop()
 
-			inputTraceID := dtracing.GetTraceID(inputCtx)
-			outputTraceID := dtracing.GetTraceID(outputCtx)
-			if test.expectTraceIddiff {
-				assert.NotEqual(t, inputTraceID, outputTraceID)
-			} else {
-				assert.Equal(t, inputTraceID, outputTraceID)
-			}
+			outputCtx := withLogger(inputCtx, inputLogger)
 
+			outputLogger := logging.Logger(outputCtx, zap.NewNop())
+			assert.Equal(t, inputLogger, outputLogger)
 		})
 	}
 
