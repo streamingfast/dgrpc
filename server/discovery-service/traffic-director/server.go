@@ -9,6 +9,7 @@ import (
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/streamingfast/dgrpc/server"
+	"github.com/streamingfast/dgrpc/server/standard"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -46,6 +47,25 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 		}
 	}
 
+	var unaryInterceptors []grpc.UnaryServerInterceptor
+	var streamInterceptors []grpc.StreamServerInterceptor
+
+	// Adds contextualized logger to interceptors, must comes after authenticator since we extract stuff from there is available.
+	// The interceptor tries to extract the `trace_id` from the logger and configure the logger to always use it.
+	unaryLog, streamLog := standard.SetupLoggingInterceptors(options.Logger)
+
+	unaryInterceptors = append(unaryInterceptors, unaryLog)
+	streamInterceptors = append(streamInterceptors, streamLog)
+
+	// Adds custom defined interceptors, they come after all others
+	if len(options.PostUnaryInterceptors) > 0 {
+		unaryInterceptors = append(unaryInterceptors, options.PostUnaryInterceptors...)
+	}
+
+	if len(options.PostStreamInterceptors) > 0 {
+		streamInterceptors = append(streamInterceptors, options.PostStreamInterceptors...)
+	}
+
 	grpcXDSServer := xds.NewGRPCServer(
 		grpc.Creds(creds),
 		grpc.KeepaliveEnforcementPolicy(
@@ -58,8 +78,8 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 				Time:    30 * time.Second, // Ping the client if it is idle for this amount of time
 				Timeout: 10 * time.Second, // Wait this amount of time after the ping before assuming connection is dead
 			}),
-		grpc_middleware.WithStreamServerChain(options.PostStreamInterceptors...),
-		grpc_middleware.WithUnaryServerChain(options.PostUnaryInterceptors...),
+		grpc_middleware.WithUnaryServerChain(unaryInterceptors...),
+		grpc_middleware.WithStreamServerChain(streamInterceptors...),
 	)
 
 	//healthGrpcServer := grpc.NewServer()

@@ -33,7 +33,8 @@ import (
 	"github.com/streamingfast/dgrpc/insecure"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/shutter"
-	"go.opencensus.io/plugin/ocgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/http2"
@@ -330,10 +331,6 @@ func (s *StandardServer) shutdownViaHTTP(timeout time.Duration) {
 //
 // **Note** Debugging a gRPC server can be done by using `export GODEBUG=http2debug=2`
 func newGRPCServer(options *server.Options) *grpc.Server {
-	// GRPC server interceptor that injects in the context the trace_id, if trace_id override option is used it will
-	// simply create a new trace_id
-	unaryTraceID, streamTraceID := SetupTracingInterceptors(options.Logger, options.OverrideTraceID)
-
 	zopts := []grpc_zap.Option{
 		grpc_zap.WithDurationField(grpc_zap.DurationToTimeMillisField),
 		grpc_zap.WithDecider(defaultLoggingDecider),
@@ -342,22 +339,24 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 
 	// Zap base server interceptor
 	zapUnaryInterceptor := grpc_zap.UnaryServerInterceptor(options.Logger, zopts...)
-	zapStreamInterceptor := grpc_zap.StreamServerInterceptor(options.Logger.With(zap.String("trace_id", "")), zopts...)
+	zapStreamInterceptor := grpc_zap.StreamServerInterceptor(options.Logger, zopts...)
+
+	tracerProvider := otel.GetTracerProvider()
 
 	// Order of interceptors is important here, index order is followed so `{one, two, three}` runs `one` then `two` then `three` passing context along the way
 	streamInterceptors := []grpc.StreamServerInterceptor{
 		grpc_ctxtags.StreamServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 		grpc_prometheus.StreamServerInterceptor,
+		otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		zapStreamInterceptor, // zap base server interceptor
-		streamTraceID,        // adds trace_id to ctx
 	}
 
 	// Order of interceptors is important here, index order is followed so `{one, two, three}` runs `one` then `two` then `three` passing context along the way
 	unaryInterceptors := []grpc.UnaryServerInterceptor{
 		grpc_ctxtags.UnaryServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 		grpc_prometheus.UnaryServerInterceptor,
+		otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		zapUnaryInterceptor, // zap base server interceptor
-		unaryTraceID,        // adds trace_id to ctx
 	}
 
 	// Authentication is executed here, so the logger that will run after him can extract information from it
@@ -397,7 +396,6 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 		),
 		grpc_middleware.WithStreamServerChain(streamInterceptors...),
 		grpc_middleware.WithUnaryServerChain(unaryInterceptors...),
-		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
 	)
 
 	grpc_prometheus.EnableHandlingTimeHistogram(grpc_prometheus.WithHistogramBuckets([]float64{0, .5, 1, 2, 3, 5, 8, 10, 20, 30}))

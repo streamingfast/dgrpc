@@ -20,7 +20,7 @@ import (
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"github.com/streamingfast/logging"
-	"go.opencensus.io/trace"
+	sftracing "github.com/streamingfast/sf-tracing"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -49,15 +49,8 @@ func SetupLoggingInterceptors(logger *zap.Logger) (grpc.UnaryServerInterceptor, 
 }
 
 func withLogger(ctx context.Context, logger *zap.Logger) context.Context {
-	rootSpan := trace.FromContext(ctx)
-	if rootSpan == nil {
-		// to avoid this case we should call the tracing middle ware
-		logger.Warn("grpc logger interceptor cannot find trace id in context")
-		return ctx
-	}
-
-	traceIDField := zap.Stringer("trace_id", rootSpan.SpanContext().TraceID)
+	traceID := sftracing.GetTraceIDOrZeroed(ctx)
 
 	// We customize the base logger with our own field only to reduce log cluttering
-	return logging.WithLogger(ctx, logger.With(traceIDField))
+	return logging.WithLogger(ctx, logger.With(zap.Stringer("trace_id", traceID)))
 }
