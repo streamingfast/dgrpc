@@ -69,6 +69,8 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.8.6
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.8.6/go.mod h1:NE8dAwJ1VU4WFdJYTlO0tdobQFdy70z8wNDU1L3VAr4=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.32.6 h1:QHbRbU/HI7SuNVqP0rDHK5jAMcwzuAex2akl3p+7YTo=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.32.6/go.mod h1:/G0zPXsUx5gZUd6ryJakuDo4VR7EJScegf1ZNK8xIGs=
+github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.0.0-20221018185641-36f91511cfd7 h1:4cXY9jZO7UoRYKyD+CssnBlwn2HTeUzCQ1b44PJijzc=
+github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.0.0-20221018185641-36f91511cfd7/go.mod h1:FwtSi1M0P8cuMlHxVso1vcivukprUr1bBwf15CRypOI=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/sarama v1.30.0/go.mod h1:zujlQQx1kzHsh4jfV1USnptCQrHAEZ2Hk8fTKCulPVs=

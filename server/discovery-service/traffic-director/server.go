@@ -8,9 +8,12 @@ import (
 	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/standard"
 	"github.com/streamingfast/shutter"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -47,15 +50,22 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 		}
 	}
 
-	var unaryInterceptors []grpc.UnaryServerInterceptor
-	var streamInterceptors []grpc.StreamServerInterceptor
+	tracerProvider := otel.GetTracerProvider()
 
 	// Adds contextualized logger to interceptors, must comes after authenticator since we extract stuff from there is available.
 	// The interceptor tries to extract the `trace_id` from the logger and configure the logger to always use it.
 	unaryLog, streamLog := standard.SetupLoggingInterceptors(options.Logger)
 
-	unaryInterceptors = append(unaryInterceptors, unaryLog)
-	streamInterceptors = append(streamInterceptors, streamLog)
+	unaryInterceptors := []grpc.UnaryServerInterceptor{
+		grpc_prometheus.UnaryServerInterceptor,
+		otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
+		unaryLog,
+	}
+	streamInterceptors := []grpc.StreamServerInterceptor{
+		grpc_prometheus.StreamServerInterceptor,
+		otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
+		streamLog,
+	}
 
 	// Adds custom defined interceptors, they come after all others
 	if len(options.PostUnaryInterceptors) > 0 {
