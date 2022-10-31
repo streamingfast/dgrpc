@@ -49,7 +49,7 @@ func SetupLoggingInterceptors(logger *zap.Logger) (grpc.UnaryServerInterceptor, 
 }
 
 func withLogger(ctx context.Context, logger *zap.Logger) context.Context {
-	traceID := sftracing.GetTraceIDOrZeroed(ctx)
+	traceID := sftracing.GetTraceID(ctx)
 
 	// We customize the base logger with our own field only to reduce log cluttering
 	return logging.WithLogger(ctx, logger.With(zap.Stringer("trace_id", traceID)))
