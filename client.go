@@ -39,10 +39,11 @@ var defaultCallOptions = []grpc.CallOption{
 	grpc.WaitForReady(true),
 }
 
+// very lightweight keepalives: see https://www.evanjones.ca/grpc-is-tricky.html
 var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
-	Time:                30 * time.Second, // send pings every (x seconds) there is no activity
-	Timeout:             10 * time.Second, // wait that amount of time for ping ack before considering the connection dead
-	PermitWithoutStream: true,             // send pings even without active streams
+	Time:                5 * time.Minute, // send pings every ... when there is no activity
+	Timeout:             5 * time.Second, // wait that amount of time for ping ack before considering the connection dead
+	PermitWithoutStream: false,
 })
 
 // NewInternalClient creates a grpc ClientConn with keep alive, tracing and plain text
