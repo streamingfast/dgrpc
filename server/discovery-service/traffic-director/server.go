@@ -10,7 +10,7 @@ import (
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/streamingfast/dgrpc/server"
-	"github.com/streamingfast/dgrpc/server/standard"
+	"github.com/streamingfast/dgrpc/server/tracelog"
 	"github.com/streamingfast/shutter"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
@@ -54,7 +54,7 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 
 	// Adds contextualized logger to interceptors, must comes after authenticator since we extract stuff from there is available.
 	// The interceptor tries to extract the `trace_id` from the logger and configure the logger to always use it.
-	unaryLog, streamLog := standard.SetupLoggingInterceptors(options.Logger)
+	unaryLog, streamLog := tracelog.SetupLoggingInterceptors(options.Logger)
 
 	unaryInterceptors := []grpc.UnaryServerInterceptor{
 		grpc_prometheus.UnaryServerInterceptor,

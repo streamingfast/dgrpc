@@ -10,7 +10,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
-	github.com/streamingfast/sf-tracing v0.0.0-20221103192900-b0236ce6865a
+	github.com/streamingfast/sf-tracing v0.0.0-20221104190152-7f721cb9b60c
 	github.com/streamingfast/shutter v1.5.0
 	github.com/stretchr/testify v1.8.0
 	go.opencensus.io v0.23.0
