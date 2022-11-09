@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"go.opencensus.io/plugin/ocgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
@@ -53,10 +54,11 @@ var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
 func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(
 		remoteAddr,
-		tracingDialOption,
 		serviceConfig,
 		insecureDialOption,
 		keepaliveDialOption,
+		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
+		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 		grpc.WithDefaultCallOptions(defaultCallOptions...),
 	)
 	return conn, err
@@ -65,10 +67,11 @@ func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 // NewExternalClient creates a grpc ClientConn with keepalive, tracing and secure TLS
 func NewExternalClient(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{
-		tracingDialOption,
 		serviceConfig,
 		keepaliveDialOption,
 		tlsClientDialOption,
+		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
+		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 		grpc.WithDefaultCallOptions(defaultCallOptions...),
 	}
 
