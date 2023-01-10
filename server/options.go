@@ -2,25 +2,35 @@ package server
 
 import (
 	"crypto/tls"
+	"net/http"
 	"net/url"
+	"time"
 
+	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
 type Options struct {
-	AuthCheckerFunc        AuthCheckerFunc
-	AuthCheckerEnforced    bool
-	HealthCheck            HealthCheck
-	HealthCheckOver        HealthCheckOver
-	Logger                 *zap.Logger
-	IsPlainText            bool
+	AuthCheckerFunc     AuthCheckerFunc
+	AuthCheckerEnforced bool
+	HealthCheck         HealthCheck
+	HealthCheckOver     HealthCheckOver
+	Logger              *zap.Logger
+	IsPlainText         bool
+	OverrideTraceID     bool
+
+	// GRPC-only options
 	PostUnaryInterceptors  []grpc.UnaryServerInterceptor
 	PostStreamInterceptors []grpc.StreamServerInterceptor
 	Registrator            func(gs *grpc.Server)
 	SecureTLSConfig        *tls.Config
-	OverrideTraceID        bool
 
+	// ConnectWeb-only options
+	ReflectionServices []string
+	Cors               *cors.Cors
+
+	// discovery-service-only options
 	ServiceDiscoveryURL *url.URL
 }
 
@@ -54,6 +64,60 @@ func WithSecureServer(config SecureTLSConfig) Option {
 	return func(options *Options) {
 		options.IsPlainText = false
 		options.SecureTLSConfig = config.asTLSConfig()
+	}
+}
+
+// WithCORS Will apply the CORS policy to your server
+// Only works with connectweb servers
+func WithCORS(c *cors.Cors) Option {
+	return func(options *Options) {
+		options.Cors = c
+	}
+}
+
+// WithPermissiveCORS is for development environments, as it disables any CORS validation
+// Only works with connectweb servers
+func WithPermissiveCORS() Option {
+	return func(options *Options) {
+		options.Cors = cors.New(cors.Options{
+			AllowedMethods: []string{
+				http.MethodHead,
+				http.MethodGet,
+				http.MethodPost,
+				http.MethodPut,
+				http.MethodPatch,
+				http.MethodDelete,
+			},
+			AllowOriginFunc: func(origin string) bool {
+				// Allow all origins, which effectively disables CORS.
+				return true
+			},
+			AllowedHeaders: []string{"*"},
+			ExposedHeaders: []string{
+				// Content-Type is in the default safelist.
+				"Accept",
+				"Accept-Encoding",
+				"Accept-Post",
+				"Connect-Accept-Encoding",
+				"Connect-Content-Encoding",
+				"Content-Encoding",
+				"Grpc-Accept-Encoding",
+				"Grpc-Encoding",
+				"Grpc-Message",
+				"Grpc-Status",
+				"Grpc-Status-Details-Bin",
+			},
+			MaxAge: int(2 * time.Hour / time.Second),
+		})
+
+	}
+}
+
+// WithReflection enables GRPC reflection for the given location string. It be called multiple times
+// Only works with connectweb servers
+func WithReflection(location string) Option {
+	return func(options *Options) {
+		options.ReflectionServices = append(options.ReflectionServices, location)
 	}
 }
 
