@@ -29,16 +29,13 @@ var cfg = `
 {
   "load_balancing_config": { "round_robin": {} }
 }`
-var serviceConfig = grpc.WithDefaultServiceConfig(cfg)
-
+var roundrobinDialOption = grpc.WithDefaultServiceConfig(cfg)
 var insecureDialOption = grpc.WithInsecure()
 var tracingDialOption = grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
 var tlsClientDialOption = grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, ""))
-var maxCallRecvMsgSize = 1024 * 1024 * 1024
-var defaultCallOptions = []grpc.CallOption{
-	grpc.MaxCallRecvMsgSize(maxCallRecvMsgSize),
-	grpc.WaitForReady(true),
-}
+
+var largeRecvMsgSizeCallOption = grpc.MaxCallRecvMsgSize(1024 * 1024 * 1024)
+var hangOnResolveErrorCallOption = grpc.WaitForReady(true)
 
 // very lightweight keepalives: see https://www.evanjones.ca/grpc-is-tricky.html
 var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
@@ -49,17 +46,24 @@ var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
 
 // NewInternalClient creates a grpc ClientConn with keep alive, tracing and plain text
 // connection (so no TLS involved, the server must also listen to a plain text socket).
+// InternalClient also has the default call option to "WaitForReady", which means
+// that it will hang indefinitely if the provided remote address does not resolve to
+// any valid endpoint. This is a desired behavior for internal services managed by
+// "discovery service" mechanisms where the remote endpoint may become ready soon.
 //
 // It's possible to debug low-level message using `export GODEBUG=http2debug=2`.
 func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(
 		remoteAddr,
-		serviceConfig,
+		roundrobinDialOption,
 		insecureDialOption,
 		keepaliveDialOption,
 		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
-		grpc.WithDefaultCallOptions(defaultCallOptions...),
+		grpc.WithDefaultCallOptions(
+			largeRecvMsgSizeCallOption,
+			hangOnResolveErrorCallOption,
+		),
 	)
 	return conn, err
 }
@@ -67,12 +71,14 @@ func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 // NewExternalClient creates a grpc ClientConn with keepalive, tracing and secure TLS
 func NewExternalClient(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{
-		serviceConfig,
+		roundrobinDialOption,
 		keepaliveDialOption,
 		tlsClientDialOption,
 		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
-		grpc.WithDefaultCallOptions(defaultCallOptions...),
+		grpc.WithDefaultCallOptions(
+			largeRecvMsgSizeCallOption,
+		),
 	}
 
 	if len(extraOpts) > 0 {
