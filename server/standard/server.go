@@ -383,20 +383,22 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 	}
 
 	s := grpc.NewServer(
-		grpc.KeepaliveEnforcementPolicy(
-			keepalive.EnforcementPolicy{
-				MinTime:             15 * time.Second,
-				PermitWithoutStream: true,
-			},
-		),
-		grpc.KeepaliveParams(
-			keepalive.ServerParameters{
-				Time:    30 * time.Second, // Ping the client if it is idle for this amount of time
-				Timeout: 10 * time.Second, // Wait this amount of time after the ping before assuming connection is dead
-			},
-		),
-		grpc_middleware.WithStreamServerChain(streamInterceptors...),
-		grpc_middleware.WithUnaryServerChain(unaryInterceptors...),
+		append([]grpc.ServerOption{
+			grpc.KeepaliveEnforcementPolicy(
+				keepalive.EnforcementPolicy{
+					MinTime:             15 * time.Second,
+					PermitWithoutStream: true,
+				},
+			),
+			grpc.KeepaliveParams(
+				keepalive.ServerParameters{
+					Time:    30 * time.Second, // Ping the client if it is idle for this amount of time
+					Timeout: 10 * time.Second, // Wait this amount of time after the ping before assuming connection is dead
+				},
+			),
+			grpc_middleware.WithStreamServerChain(streamInterceptors...),
+			grpc_middleware.WithUnaryServerChain(unaryInterceptors...),
+		}, options.ServerOptions...)...,
 	)
 
 	grpc_prometheus.EnableHandlingTimeHistogram(grpc_prometheus.WithHistogramBuckets([]float64{0, .5, 1, 2, 3, 5, 8, 10, 20, 30}))

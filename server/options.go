@@ -21,6 +21,7 @@ type Options struct {
 	OverrideTraceID     bool
 
 	// GRPC-only options
+	ServerOptions          []grpc.ServerOption
 	PostUnaryInterceptors  []grpc.UnaryServerInterceptor
 	PostStreamInterceptors []grpc.StreamServerInterceptor
 	Registrator            func(gs *grpc.Server)
@@ -220,6 +221,21 @@ func WithPostUnaryInterceptor(interceptor grpc.UnaryServerInterceptor) Option {
 func WithPostStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option {
 	return func(options *Options) {
 		options.PostStreamInterceptors = append(options.PostStreamInterceptors, interceptor)
+	}
+}
+
+// WithGRPCServerOptions let you configure (or re-configure) the set of
+// gRPC option passed to [grpc.NewServer] call. The options are appended
+// at the end of gRPC server options computed by `dgrpc`. Using WithGRPCServerOptions
+// you can for example control the [grpc.MaxCallRecvMsgSize], [grpc.MaxCallSendMsgSize],
+// [grpc.KeepaliveEnforcementPolicy], [grpc.KeepaliveParams] and more.
+//
+// It's important to note that if you pass [grpc_middleware.WithStreamServerChain] or
+// [grpc_middleware.WithUnaryServerChain], you are going to override [WithPostUnaryInterceptor]
+// and [WithPostUnaryInterceptor] since those are configured via [grpc.NewServer].
+func WithGRPCServerOptions(opts ...grpc.ServerOption) Option {
+	return func(options *Options) {
+		options.ServerOptions = opts
 	}
 }
 
