@@ -227,7 +227,7 @@ func WithPostStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option 
 // WithGRPCServerOptions let you configure (or re-configure) the set of
 // gRPC option passed to [grpc.NewServer] call. The options are appended
 // at the end of gRPC server options computed by `dgrpc`. Using WithGRPCServerOptions
-// you can for example control the [grpc.MaxCallRecvMsgSize], [grpc.MaxCallSendMsgSize],
+// you can for example control the [grpc.MaxRecvMsgSize], [grpc.MaxSendMsgSize],
 // [grpc.KeepaliveEnforcementPolicy], [grpc.KeepaliveParams] and more.
 //
 // It's important to note that if you pass [grpc_middleware.WithStreamServerChain] or
