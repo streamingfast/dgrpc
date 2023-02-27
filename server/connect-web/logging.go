@@ -18,4 +18,4 @@ import (
 	"github.com/streamingfast/logging"
 )
 
-var zlog, _ = logging.PackageLogger("dgrpc", "github.com/streamingfast/dgrpc")
+var zlog, _ = logging.PackageLogger("dgrpc", "github.com/streamingfast/dgrpc/server/connect-web")
