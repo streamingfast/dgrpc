@@ -115,15 +115,15 @@ func manageConnections(ctx context.Context, target resolver.Target, cc resolver.
 		firstTime = false
 
 		addresses := []resolver.Address{}
-		host, port, err := parseTarget(target.Endpoint)
+		host, port, err := parseTarget(target.Endpoint())
 		if err != nil {
-			zlog.Error("cannot parse target endpoint, invalid format", zap.String("target_endpoint", target.Endpoint))
+			zlog.Error("cannot parse target endpoint, invalid format", zap.String("target_endpoint", target.Endpoint()))
 			panic(err)
 		}
 
 		ips, err := net.LookupIP(host)
 		if err != nil {
-			zlog.Warn("cannot resolve grpc endpoint", zap.String("target_endpoint", target.Endpoint))
+			zlog.Warn("cannot resolve grpc endpoint", zap.String("target_endpoint", target.Endpoint()))
 			time.Sleep(time.Second * 5)
 			continue
 		}
