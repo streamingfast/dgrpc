@@ -76,7 +76,7 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 		streamInterceptors = append(streamInterceptors, options.PostStreamInterceptors...)
 	}
 
-	grpcXDSServer := xds.NewGRPCServer(
+	opts := []grpc.ServerOption{
 		grpc.Creds(creds),
 		grpc.KeepaliveEnforcementPolicy(
 			keepalive.EnforcementPolicy{
@@ -90,6 +90,15 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 			}),
 		grpc_middleware.WithUnaryServerChain(unaryInterceptors...),
 		grpc_middleware.WithStreamServerChain(streamInterceptors...),
+	}
+
+	for _, opt := range options.ServerOptions {
+		opts = append(opts, opt)
+	}
+
+	//	options.ServerOptions...
+	grpcXDSServer := xds.NewGRPCServer(
+		opts...,
 	)
 
 	//healthGrpcServer := grpc.NewServer()
