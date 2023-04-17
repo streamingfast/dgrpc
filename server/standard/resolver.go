@@ -130,7 +130,6 @@ func manageConnections(ctx context.Context, target resolver.Target, cc resolver.
 		for _, ip := range ips {
 			addresses = append(addresses, resolver.Address{
 				Addr: ip.String() + ":" + port,
-				Type: resolver.Backend,
 			})
 		}
 
