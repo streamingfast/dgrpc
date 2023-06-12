@@ -12,13 +12,11 @@ import (
 )
 
 type Options struct {
-	AuthCheckerFunc     AuthCheckerFunc
-	AuthCheckerEnforced bool
-	HealthCheck         HealthCheck
-	HealthCheckOver     HealthCheckOver
-	Logger              *zap.Logger
-	IsPlainText         bool
-	OverrideTraceID     bool
+	HealthCheck     HealthCheck
+	HealthCheckOver HealthCheckOver
+	Logger          *zap.Logger
+	IsPlainText     bool
+	OverrideTraceID bool
 
 	// GRPC-only options
 	ServerOptions          []grpc.ServerOption
@@ -148,19 +146,6 @@ func WithPlainTextServer() Option {
 	return func(options *Options) {
 		options.IsPlainText = true
 		options.SecureTLSConfig = nil
-	}
-}
-
-// WithAuthChecker option can be used to pass a function that will be called
-// on connection, validating authentication with 'Authorization: bearer' header
-//
-// If `enforced` is set to `true`, the token is required and an error is thrown
-// when it's not present. If sets to `false`, it's still extracted from the request
-// metadata and pass to the auth checker function.
-func WithAuthChecker(authChecker AuthCheckerFunc, enforced bool) Option {
-	return func(options *Options) {
-		options.AuthCheckerFunc = authChecker
-		options.AuthCheckerEnforced = enforced
 	}
 }
 

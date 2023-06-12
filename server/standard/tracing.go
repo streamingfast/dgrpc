@@ -18,11 +18,13 @@ import (
 	"context"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+
+	"google.golang.org/grpc"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/streamingfast/dtracing"
 	"go.opencensus.io/trace"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 )
 
 func SetupTracingInterceptors(logger *zap.Logger, overrideTraceID bool) (grpc.UnaryServerInterceptor, grpc.StreamServerInterceptor) {

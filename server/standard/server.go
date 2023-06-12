@@ -360,12 +360,6 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 		zapUnaryInterceptor, // zap base server interceptor
 	}
 
-	// Authentication is executed here, so the logger that will run after him can extract information from it
-	if options.AuthCheckerFunc != nil {
-		unaryInterceptors = append(unaryInterceptors, server.UnaryAuthChecker(options.AuthCheckerEnforced, options.AuthCheckerFunc))
-		streamInterceptors = append(streamInterceptors, server.StreamAuthChecker(options.AuthCheckerEnforced, options.AuthCheckerFunc))
-	}
-
 	// Adds contextualized logger to interceptors, must comes after authenticator since we extract stuff from there is available.
 	// The interceptor tries to extract the `trace_id` from the logger and configure the logger to always use it.
 	unaryLog, streamLog := tracelog.SetupLoggingInterceptors(options.Logger)
