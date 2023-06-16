@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/bufbuild/connect-go"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -19,11 +20,13 @@ type Options struct {
 	OverrideTraceID bool
 
 	// GRPC-only options
-	ServerOptions          []grpc.ServerOption
-	PostUnaryInterceptors  []grpc.UnaryServerInterceptor
-	PostStreamInterceptors []grpc.StreamServerInterceptor
-	Registrator            func(gs *grpc.Server)
-	SecureTLSConfig        *tls.Config
+	ServerOptions            []grpc.ServerOption
+	PostUnaryInterceptors    []grpc.UnaryServerInterceptor
+	PostStreamInterceptors   []grpc.StreamServerInterceptor
+	ConnectExtraInterceptors []connect.Interceptor
+
+	Registrator     func(gs *grpc.Server)
+	SecureTLSConfig *tls.Config
 
 	// ConnectWeb-only options
 	ReflectionServices []string
@@ -206,6 +209,14 @@ func WithPostUnaryInterceptor(interceptor grpc.UnaryServerInterceptor) Option {
 func WithPostStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option {
 	return func(options *Options) {
 		options.PostStreamInterceptors = append(options.PostStreamInterceptors, interceptor)
+	}
+}
+
+// WithConnectInterceptor option can be used to add your own `connectWeb interceptor`
+// after all others defined automatically by the package.
+func WithConnectInterceptor(interceptor connect.Interceptor) Option {
+	return func(options *Options) {
+		options.ConnectExtraInterceptors = append(options.ConnectExtraInterceptors, interceptor)
 	}
 }
 

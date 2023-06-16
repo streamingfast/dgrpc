@@ -71,13 +71,14 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		mux.Handle("/healthz", http.HandlerFunc(srv.healthCheckHandler))
 	}
 
-	var connectOpts []connect_go.HandlerOption
-	connectOpts = append(connectOpts, connect_go.WithInterceptors(
-		//		connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason, returning EOF
+	interceptors := append([]connect_go.Interceptor{
+		//connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason, returning EOF
 		otelconnect.NewInterceptor(),
 		tracelog.NewConnectLoggingInterceptor(srv.logger),
-	),
-	)
+	}, options.ConnectExtraInterceptors...)
+
+	var connectOpts []connect_go.HandlerOption
+	connectOpts = append(connectOpts, connect_go.WithInterceptors(interceptors...))
 
 	for _, hg := range handlerGetters {
 		pattern, handler := hg(connectOpts...)
