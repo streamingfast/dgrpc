@@ -21,8 +21,14 @@ import (
 	"net"
 	"net/http"
 
+	connect_go "github.com/bufbuild/connect-go"
+
+	otelconnect "github.com/bufbuild/connect-opentelemetry-go"
+	//	connect_go_prometheus "github.com/easyCZ/connect-go-prometheus"
+
 	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
 	"github.com/streamingfast/dgrpc/server"
+	"github.com/streamingfast/dgrpc/server/tracelog"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
@@ -45,7 +51,9 @@ type ConnectWebServer struct {
 	http2Server *http2.Server
 }
 
-func New(mappings map[string]http.Handler, opts ...server.Option) *ConnectWebServer {
+type HandlerGetter func(opts ...connect_go.HandlerOption) (string, http.Handler)
+
+func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServer {
 	options := server.NewOptions()
 	for _, opt := range opts {
 		opt(options)
@@ -63,7 +71,16 @@ func New(mappings map[string]http.Handler, opts ...server.Option) *ConnectWebSer
 		mux.Handle("/healthz", http.HandlerFunc(srv.healthCheckHandler))
 	}
 
-	for pattern, handler := range mappings {
+	var connectOpts []connect_go.HandlerOption
+	connectOpts = append(connectOpts, connect_go.WithInterceptors(
+		//		connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason, returning EOF
+		otelconnect.NewInterceptor(),
+		tracelog.NewConnectLoggingInterceptor(srv.logger),
+	),
+	)
+
+	for _, hg := range handlerGetters {
+		pattern, handler := hg(connectOpts...)
 		mux.Handle(pattern, handler)
 	}
 
