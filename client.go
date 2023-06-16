@@ -68,6 +68,27 @@ func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
 	return conn, err
 }
 
+// NewInternalNoWaitClient creates a grpc ClientConn with keep alive, tracing and plain text
+// connection (so no TLS involved, the server must also listen to a plain text socket).
+// InternalClient does not have the default call option to "WaitForReady", which means
+// that it will not hang indefinitely if the provided remote address does not resolve to
+// any valid endpoint. This is a desired behavior for internal services where the remote endpoint
+// is not managed by a "discovery service" mechanism.
+func NewInternalNoWaitClient(remoteAddr string) (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(
+		remoteAddr,
+		roundrobinDialOption,
+		insecureDialOption,
+		keepaliveDialOption,
+		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
+		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
+		grpc.WithDefaultCallOptions(
+			largeRecvMsgSizeCallOption,
+		),
+	)
+	return conn, err
+}
+
 // NewExternalClient creates a grpc ClientConn with keepalive, tracing and secure TLS
 func NewExternalClient(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{
