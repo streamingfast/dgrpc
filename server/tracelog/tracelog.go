@@ -2,7 +2,6 @@ package tracelog
 
 import (
 	"context"
-	"fmt"
 
 	gcppropagator "github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator"
 	connect_go "github.com/bufbuild/connect-go"
@@ -71,8 +70,6 @@ func (i LoggingInterceptor) WrapStreamingClient(next connect_go.StreamingClientF
 
 func (i LoggingInterceptor) WrapStreamingHandler(next connect_go.StreamingHandlerFunc) connect_go.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect_go.StreamingHandlerConn) error {
-		fmt.Println("wrapped handler streaming")
-		i.logger.Info("yes reawared")
 		ctx = withLogger(ctx, i.logger)
 		return next(ctx, conn)
 	}
