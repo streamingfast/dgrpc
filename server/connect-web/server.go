@@ -72,10 +72,14 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 	}
 
 	interceptors := append([]connect_go.Interceptor{
-		//connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason, returning EOF
+		//connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason returning EOF. prometheus disabled
 		otelconnect.NewInterceptor(),
 		tracelog.NewConnectLoggingInterceptor(srv.logger),
 	}, options.ConnectExtraInterceptors...)
+
+	if options.ConnectWebStrictContentType {
+		interceptors = append(interceptors, ContentTypeInterceptor{allowJSON: options.ConnectWebAllowJSON})
+	}
 
 	var connectOpts []connect_go.HandlerOption
 	connectOpts = append(connectOpts, connect_go.WithInterceptors(interceptors...))
@@ -85,16 +89,16 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		mux.Handle(pattern, handler)
 	}
 
-	if len(options.ReflectionServices) != 0 {
-		reflector := grpcreflect.NewStaticReflector(options.ReflectionServices...)
+	if len(options.ConnectWebReflectionServices) != 0 {
+		reflector := grpcreflect.NewStaticReflector(options.ConnectWebReflectionServices...)
 		mux.Handle(grpcreflect.NewHandlerV1(reflector))
 		mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
 	}
 
 	var handler http.Handler
 	handler = mux
-	if options.Cors != nil {
-		handler = options.Cors.Handler(mux)
+	if options.ConnectWebCORS != nil {
+		handler = options.ConnectWebCORS.Handler(mux)
 	}
 
 	handler = h2c.NewHandler(handler, &http2.Server{})
@@ -185,5 +189,44 @@ func (s *ConnectWebServer) healthCheckHandler(w http.ResponseWriter, r *http.Req
 		if err == nil {
 			w.Write(fallbackBodyJSON)
 		}
+	}
+}
+
+type ContentTypeInterceptor struct {
+	allowJSON bool
+}
+
+func (i ContentTypeInterceptor) checkContentType(headers http.Header) error {
+	switch headers.Get("Content-Type") {
+	case "application/connect+json", "application/json":
+		if !i.allowJSON {
+			return fmt.Errorf("invalid content-type: application/connect+json not supported")
+		}
+	case "application/connect", "application/connect+proto", "application/grpc":
+		return nil
+	}
+	return fmt.Errorf("invalid content-type, only GRPC and Connect are supported")
+}
+
+func (i ContentTypeInterceptor) WrapUnary(next connect_go.UnaryFunc) connect_go.UnaryFunc {
+	return func(ctx context.Context, req connect_go.AnyRequest) (connect_go.AnyResponse, error) {
+		if err := i.checkContentType(req.Header()); err != nil {
+			return nil, err
+		}
+		return next(ctx, req)
+	}
+}
+
+// Noop
+func (i ContentTypeInterceptor) WrapStreamingClient(next connect_go.StreamingClientFunc) connect_go.StreamingClientFunc {
+	return next
+}
+
+func (i ContentTypeInterceptor) WrapStreamingHandler(next connect_go.StreamingHandlerFunc) connect_go.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect_go.StreamingHandlerConn) error {
+		if err := i.checkContentType(conn.RequestHeader()); err != nil {
+			return err
+		}
+		return next(ctx, conn)
 	}
 }

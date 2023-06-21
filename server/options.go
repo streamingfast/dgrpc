@@ -29,8 +29,10 @@ type Options struct {
 	SecureTLSConfig *tls.Config
 
 	// ConnectWeb-only options
-	ReflectionServices []string
-	Cors               *cors.Cors
+	ConnectWebReflectionServices []string
+	ConnectWebAllowJSON          bool
+	ConnectWebStrictContentType  bool
+	ConnectWebCORS               *cors.Cors
 
 	// discovery-service-only options
 	ServiceDiscoveryURL *url.URL
@@ -73,7 +75,7 @@ func WithSecureServer(config SecureTLSConfig) Option {
 // Only works with connectweb servers
 func WithCORS(c *cors.Cors) Option {
 	return func(options *Options) {
-		options.Cors = c
+		options.ConnectWebCORS = c
 	}
 }
 
@@ -81,7 +83,7 @@ func WithCORS(c *cors.Cors) Option {
 // Only works with connectweb servers
 func WithPermissiveCORS() Option {
 	return func(options *Options) {
-		options.Cors = cors.New(cors.Options{
+		options.ConnectWebCORS = cors.New(cors.Options{
 			AllowedMethods: []string{
 				http.MethodHead,
 				http.MethodGet,
@@ -119,7 +121,7 @@ func WithPermissiveCORS() Option {
 // Only works with connectweb servers
 func WithReflection(location string) Option {
 	return func(options *Options) {
-		options.ReflectionServices = append(options.ReflectionServices, location)
+		options.ConnectWebReflectionServices = append(options.ConnectWebReflectionServices, location)
 	}
 }
 
@@ -217,6 +219,14 @@ func WithPostStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option 
 func WithConnectInterceptor(interceptor connect.Interceptor) Option {
 	return func(options *Options) {
 		options.ConnectExtraInterceptors = append(options.ConnectExtraInterceptors, interceptor)
+	}
+}
+
+// WithConnectStrictContentType option can be used to enforce valid content-type
+func WithConnectStrictContentType(allowJSON bool) Option {
+	return func(options *Options) {
+		options.ConnectWebStrictContentType = true
+		options.ConnectWebAllowJSON = allowJSON
 	}
 }
 
