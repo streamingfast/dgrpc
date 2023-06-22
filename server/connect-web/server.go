@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 
 	connect_go "github.com/bufbuild/connect-go"
 
@@ -197,18 +198,19 @@ type ContentTypeInterceptor struct {
 }
 
 func (i ContentTypeInterceptor) checkContentType(headers http.Header) error {
-	contentType := headers.Get("Content-Type")
-	switch contentType {
-	case "application/connect+json", "application/json":
+	ct := headers.Get("Content-Type")
+
+	switch {
+	case strings.HasSuffix(ct, "json"):
 		if !i.allowJSON {
-			return fmt.Errorf("invalid content-type: application/connect+json not supported")
+			return fmt.Errorf("invalid content-type: 'json' not supported")
 		}
-	case "application/connect", "application/connect+proto", "application/grpc", "":
+	case strings.HasPrefix(ct, "application/connect"), strings.HasPrefix(ct, "application/grpc"):
 		return nil
 	default:
-		zlog.Debug("invalid content-type", zap.String("content_type", contentType))
+		zlog.Debug("invalid content-type", zap.String("content_type", ct))
 	}
-	return fmt.Errorf("invalid content-type %q, only GRPC and Connect are supported", contentType)
+	return fmt.Errorf("invalid content-type %q, only GRPC and Connect are supported", ct)
 }
 
 func (i ContentTypeInterceptor) WrapUnary(next connect_go.UnaryFunc) connect_go.UnaryFunc {
