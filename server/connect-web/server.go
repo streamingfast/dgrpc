@@ -197,15 +197,18 @@ type ContentTypeInterceptor struct {
 }
 
 func (i ContentTypeInterceptor) checkContentType(headers http.Header) error {
-	switch headers.Get("Content-Type") {
+	contentType := headers.Get("Content-Type")
+	switch contentType {
 	case "application/connect+json", "application/json":
 		if !i.allowJSON {
 			return fmt.Errorf("invalid content-type: application/connect+json not supported")
 		}
-	case "application/connect", "application/connect+proto", "application/grpc":
+	case "application/connect", "application/connect+proto", "application/grpc", "":
 		return nil
+	default:
+		zlog.Debug("invalid content-type", zap.String("content_type", contentType))
 	}
-	return fmt.Errorf("invalid content-type, only GRPC and Connect are supported")
+	return fmt.Errorf("invalid content-type %q, only GRPC and Connect are supported", contentType)
 }
 
 func (i ContentTypeInterceptor) WrapUnary(next connect_go.UnaryFunc) connect_go.UnaryFunc {
