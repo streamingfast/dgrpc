@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	connect_go "github.com/bufbuild/connect-go"
+	grpchealth "github.com/bufbuild/connect-grpchealth-go"
 
 	otelconnect "github.com/bufbuild/connect-opentelemetry-go"
 	//	connect_go_prometheus "github.com/easyCZ/connect-go-prometheus"
@@ -70,6 +71,8 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 
 	if options.HealthCheck != nil {
 		mux.Handle("/healthz", http.HandlerFunc(srv.healthCheckHandler))
+		checker := grpchealth.NewStaticChecker()
+		mux.Handle(grpchealth.NewHandler(checker))
 	}
 
 	interceptors := append([]connect_go.Interceptor{
