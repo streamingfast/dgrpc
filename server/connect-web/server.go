@@ -49,8 +49,7 @@ type ConnectWebServer struct {
 	logger  *zap.Logger
 	options *server.Options
 
-	handler     http.Handler
-	http2Server *http2.Server
+	handler http.Handler
 }
 
 type HandlerGetter func(opts ...connect_go.HandlerOption) (string, http.Handler)
@@ -132,6 +131,7 @@ func (s *ConnectWebServer) Launch(serverListenerAddress string) {
 		Handler:  s.handler,
 		ErrorLog: errorLogger,
 	}
+	s.OnTerminating(func(_ error) { srv.Close() })
 
 	if s.options.SecureTLSConfig != nil {
 		s.logger.Info("serving over TLS", zap.String("listen_addr", serverListenerAddress))
