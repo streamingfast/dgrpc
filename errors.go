@@ -31,9 +31,13 @@ func IsGRPCErrorCode(err error, code codes.Code) bool {
 //		// Do something
 //	}
 func AsGRPCError(err error) *status.Status {
+	type grpcError interface {
+		GRPCStatus() *status.Status
+	}
+
 	for next := err; next != nil; next = errors.Unwrap(next) {
-		if status, ok := status.FromError(next); ok {
-			return status
+		if status, ok := next.(grpcError); ok {
+			return status.GRPCStatus()
 		}
 	}
 
