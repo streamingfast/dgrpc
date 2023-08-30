@@ -32,11 +32,14 @@ type Options struct {
 	ConnectWebReflectionServices []string
 	ConnectWebAllowJSON          bool
 	ConnectWebStrictContentType  bool
+	ConnectWebHTTPHandlers       []HTTPHandlerGetter
 	ConnectWebCORS               *cors.Cors
 
 	// discovery-service-only options
 	ServiceDiscoveryURL *url.URL
 }
+
+type HTTPHandlerGetter func() (string, http.Handler)
 
 func NewOptions() *Options {
 	return &Options{
@@ -250,5 +253,12 @@ func WithGRPCServerOptions(opts ...grpc.ServerOption) Option {
 func OverrideTraceID() Option {
 	return func(options *Options) {
 		options.OverrideTraceID = true
+	}
+}
+
+// WithConnectStrictContentType option can be used to add http hanlders to the connect web server
+func WithConnectWebHTTPHandlers(handlerGetters []HTTPHandlerGetter) Option {
+	return func(options *Options) {
+		options.ConnectWebHTTPHandlers = handlerGetters
 	}
 }

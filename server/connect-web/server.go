@@ -70,8 +70,13 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 
 	if options.HealthCheck != nil {
 		mux.Handle("/healthz", http.HandlerFunc(srv.healthCheckHandler))
-		checker := grpchealth.NewStaticChecker()
-		mux.Handle(grpchealth.NewHandler(checker))
+		mux.Handle(grpchealth.NewHandler(grpchealth.NewStaticChecker()))
+	}
+
+	for _, handlerGetter := range options.ConnectWebHTTPHandlers {
+		pattern, handler := handlerGetter()
+		mux.Handle(pattern, handler)
+
 	}
 
 	interceptors := append([]connect_go.Interceptor{
@@ -104,9 +109,7 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		handler = options.ConnectWebCORS.Handler(mux)
 	}
 
-	handler = h2c.NewHandler(handler, &http2.Server{})
-
-	srv.handler = handler
+	srv.handler = h2c.NewHandler(handler, &http2.Server{})
 
 	return srv
 }
