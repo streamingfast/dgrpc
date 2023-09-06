@@ -25,7 +25,7 @@ func Bootstrap(u *url.URL) error {
 		bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
 		zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))
 		if bootStrapFilename == "" {
-			return fmt.Errorf("GRPC_XDS_BOOTSTRAP environment var must be set when using traffic director")
+			return fmt.Errorf("GRPC_XDS_BOOTSTRAP environment var must be set when using xds")
 		}
 		return nil
 
