@@ -18,7 +18,7 @@ func ServerFromOptions(opts ...server.Option) server.Server {
 	if options.ServiceDiscoveryURL != nil {
 		u := options.ServiceDiscoveryURL
 		switch u.Scheme {
-		case "traffic-director":
+		case "traffic-director", "xds":
 			clientOnly := strings.ToUpper(u.Query().Get("client_only")) == "TRUE"
 			if !clientOnly {
 				zlog.Info("launching traffic director base server", zap.Stringer("url", u))
