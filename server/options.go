@@ -257,6 +257,8 @@ func OverrideTraceID() Option {
 }
 
 // WithConnectStrictContentType option can be used to add http hanlders to the connect web server
+// these handlers will be added to the router AFTER the connect-web handlers, and thus have a lower
+// priority than the connect-web handlers
 func WithConnectWebHTTPHandlers(handlerGetters []HTTPHandlerGetter) Option {
 	return func(options *Options) {
 		options.ConnectWebHTTPHandlers = handlerGetters

@@ -22,13 +22,14 @@ import (
 	"net/http"
 	"strings"
 
+	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
+
 	connect_go "github.com/bufbuild/connect-go"
 	grpchealth "github.com/bufbuild/connect-grpchealth-go"
 
 	otelconnect "github.com/bufbuild/connect-opentelemetry-go"
 	//	connect_go_prometheus "github.com/easyCZ/connect-go-prometheus"
 
-	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/tracelog"
 	"github.com/streamingfast/shutter"
@@ -66,19 +67,6 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		logger:  options.Logger,
 	}
 
-	mux := http.NewServeMux()
-
-	if options.HealthCheck != nil {
-		mux.Handle("/healthz", http.HandlerFunc(srv.healthCheckHandler))
-		mux.Handle(grpchealth.NewHandler(grpchealth.NewStaticChecker()))
-	}
-
-	for _, handlerGetter := range options.ConnectWebHTTPHandlers {
-		pattern, handler := handlerGetter()
-		mux.Handle(pattern, handler)
-
-	}
-
 	interceptors := append([]connect_go.Interceptor{
 		//connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason returning EOF. prometheus disabled
 		otelconnect.NewInterceptor(),
@@ -92,6 +80,10 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 	var connectOpts []connect_go.HandlerOption
 	connectOpts = append(connectOpts, connect_go.WithInterceptors(interceptors...))
 
+	mux := http.NewServeMux()
+
+	// Routes are tested in the order they were added to the router. If two routes match, the first one wins
+	// ConnectWeb Path should take priority
 	for _, hg := range handlerGetters {
 		pattern, handler := hg(connectOpts...)
 		mux.Handle(pattern, handler)
@@ -101,6 +93,16 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		reflector := grpcreflect.NewStaticReflector(options.ConnectWebReflectionServices...)
 		mux.Handle(grpcreflect.NewHandlerV1(reflector))
 		mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
+	}
+
+	if options.HealthCheck != nil {
+		mux.Handle("/healthz", http.HandlerFunc(srv.healthCheckHandler))
+		mux.Handle(grpchealth.NewHandler(grpchealth.NewStaticChecker()))
+	}
+
+	for _, handlerGetter := range options.ConnectWebHTTPHandlers {
+		pattern, handler := handlerGetter()
+		mux.Handle(pattern, handler)
 	}
 
 	var handler http.Handler
