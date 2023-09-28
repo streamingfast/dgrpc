@@ -22,12 +22,12 @@ import (
 	"net/http"
 	"strings"
 
-	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
-
 	connect_go "github.com/bufbuild/connect-go"
 	grpchealth "github.com/bufbuild/connect-grpchealth-go"
-
+	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
 	otelconnect "github.com/bufbuild/connect-opentelemetry-go"
+	gmux "github.com/gorilla/mux"
+
 	//	connect_go_prometheus "github.com/easyCZ/connect-go-prometheus"
 
 	"github.com/streamingfast/dgrpc/server"
@@ -80,13 +80,13 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 	var connectOpts []connect_go.HandlerOption
 	connectOpts = append(connectOpts, connect_go.WithInterceptors(interceptors...))
 
-	mux := http.NewServeMux()
+	mux := gmux.NewRouter()
 
-	// Routes are tested in the order they were added to the router. If two routes match, the first one wins
-	// ConnectWeb Path should take priority
 	for _, hg := range handlerGetters {
-		pattern, handler := hg(connectOpts...)
-		mux.Handle(pattern, handler)
+		path, handler := hg(connectOpts...)
+		// Note: connect web handlers return a path prefix, and within the handler
+		// they route to the correct GRPC Method
+		mux.PathPrefix(path).Handler(handler)
 	}
 
 	if len(options.ConnectWebReflectionServices) != 0 {
