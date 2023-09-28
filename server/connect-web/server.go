@@ -91,8 +91,10 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 
 	if len(options.ConnectWebReflectionServices) != 0 {
 		reflector := grpcreflect.NewStaticReflector(options.ConnectWebReflectionServices...)
-		mux.Handle(grpcreflect.NewHandlerV1(reflector))
-		mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
+		path, handler := grpcreflect.NewHandlerV1(reflector)
+		mux.PathPrefix(path).Handler(handler)
+		path, handler = grpcreflect.NewHandlerV1Alpha(reflector)
+		mux.PathPrefix(path).Handler(handler)
 	}
 
 	if options.HealthCheck != nil {
