@@ -97,9 +97,12 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 	}
 
 	//	options.ServerOptions...
-	grpcXDSServer := xds.NewGRPCServer(
+	grpcXDSServer, err := xds.NewGRPCServer(
 		opts...,
 	)
+	if err != nil {
+		panic(fmt.Errorf("creating grpc server: %w", err))
+	}
 
 	//healthGrpcServer := grpc.NewServer()
 	healthServer := health.NewServer()
