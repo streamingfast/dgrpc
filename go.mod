@@ -24,7 +24,7 @@ require (
 	go.uber.org/atomic v1.10.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/net v0.12.0
-	google.golang.org/grpc v1.58.0
+	google.golang.org/grpc v1.58.3
 )
 
 require (
