@@ -24,6 +24,32 @@ if you wish to contribute to this code base.
 
 This codebase uses unit tests extensively, please write and run tests.
 
+## Notes
+As of commit `49c1ad3ecbaa5ab09850bdd555cc6d8422b6911b`, the http handler for `connect-web/server` has changed from `net/http` to `github.com/gorilla/mux`. Please refer to https://github.com/gorilla/mux when creating a handler.
+
+Here is an example on how to do it:
+```bash
+options := []dgrpcserver.Option{
+    [...]
+}
+options = append(options, 
+    dgrpcserver.WithConnectWebHTTPHandlers([]dgrpcserver.HTTPHandlerGetter{
+        func() (string, http.Handler) {
+            return "/auth/callback", authCallback
+        },
+
+        func() (string, http.Handler) {
+            return "/articles/{id}/{articleName}", articlesCallback
+        },
+    }),
+)
+[...]
+
+srv := connectweb.New([]connectweb.HandlerGetter{...httpHandlers}, options...)
+[...]
+srv.Launch(addr)
+```
+
 ## License
 
 [Apache 2.0](LICENSE)
