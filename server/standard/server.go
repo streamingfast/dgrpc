@@ -427,6 +427,10 @@ func defaultServerCodeLevel(code codes.Code) zapcore.Level {
 		if code == codes.Unknown {
 			return zap.DebugLevel
 		}
+
+		if code == codes.NotFound {
+			return zap.DebugLevel
+		}
 	}
 
 	return grpc_zap.DefaultCodeToLevel(code)
