@@ -168,8 +168,9 @@ func (s *ConnectWebServer) checkHealth(ctx context.Context) (isReady bool, out i
 }
 
 func (s *ConnectWebServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-
 	isReady, out, err := s.checkHealth(r.Context())
+
+	w.Header().Set("Content-Type", "application/json")
 
 	if !isReady {
 		w.WriteHeader(http.StatusServiceUnavailable)

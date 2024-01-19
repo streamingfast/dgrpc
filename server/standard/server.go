@@ -270,6 +270,8 @@ func (s *StandardServer) healthHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		isReady, out, err := s.healthCheck(r.Context())
 
+		w.Header().Set("Content-Type", "application/json")
+
 		if !isReady {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		} else {
