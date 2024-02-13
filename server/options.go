@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/bufbuild/connect-go"
+	"connectrpc.com/connect"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"

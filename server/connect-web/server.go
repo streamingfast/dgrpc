@@ -22,14 +22,13 @@ import (
 	"net/http"
 	"strings"
 
-	connect_go "github.com/bufbuild/connect-go"
-	grpchealth "github.com/bufbuild/connect-grpchealth-go"
-	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
-	otelconnect "github.com/bufbuild/connect-opentelemetry-go"
+	"connectrpc.com/connect"
+	"connectrpc.com/grpchealth"
+	"connectrpc.com/grpcreflect"
+	"connectrpc.com/otelconnect"
 	gmux "github.com/gorilla/mux"
 
 	//	connect_go_prometheus "github.com/easyCZ/connect-go-prometheus"
-
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/tracelog"
 	"github.com/streamingfast/shutter"
@@ -53,7 +52,7 @@ type ConnectWebServer struct {
 	handler http.Handler
 }
 
-type HandlerGetter func(opts ...connect_go.HandlerOption) (string, http.Handler)
+type HandlerGetter func(opts ...connect.HandlerOption) (string, http.Handler)
 
 func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServer {
 	options := server.NewOptions()
@@ -67,9 +66,14 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		logger:  options.Logger,
 	}
 
-	interceptors := append([]connect_go.Interceptor{
+	otlInterceptor, err := otelconnect.NewInterceptor()
+	if err != nil {
+		srv.Shutdown(fmt.Errorf("unable to create otel interceptor: %w", err))
+		return nil
+	}
+	interceptors := append([]connect.Interceptor{
 		//connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason returning EOF. prometheus disabled
-		otelconnect.NewInterceptor(),
+		otlInterceptor,
 		tracelog.NewConnectLoggingInterceptor(srv.logger),
 	}, options.ConnectExtraInterceptors...)
 
@@ -77,8 +81,8 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		interceptors = append(interceptors, ContentTypeInterceptor{allowJSON: options.ConnectWebAllowJSON})
 	}
 
-	var connectOpts []connect_go.HandlerOption
-	connectOpts = append(connectOpts, connect_go.WithInterceptors(interceptors...))
+	var connectOpts []connect.HandlerOption
+	connectOpts = append(connectOpts, connect.WithInterceptors(interceptors...))
 
 	mux := gmux.NewRouter()
 
@@ -224,8 +228,8 @@ func (i ContentTypeInterceptor) checkContentType(headers http.Header) error {
 	return fmt.Errorf("invalid content-type %q, only GRPC and Connect are supported", ct)
 }
 
-func (i ContentTypeInterceptor) WrapUnary(next connect_go.UnaryFunc) connect_go.UnaryFunc {
-	return func(ctx context.Context, req connect_go.AnyRequest) (connect_go.AnyResponse, error) {
+func (i ContentTypeInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		if err := i.checkContentType(req.Header()); err != nil {
 			return nil, err
 		}
@@ -234,12 +238,12 @@ func (i ContentTypeInterceptor) WrapUnary(next connect_go.UnaryFunc) connect_go.
 }
 
 // Noop
-func (i ContentTypeInterceptor) WrapStreamingClient(next connect_go.StreamingClientFunc) connect_go.StreamingClientFunc {
+func (i ContentTypeInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return next
 }
 
-func (i ContentTypeInterceptor) WrapStreamingHandler(next connect_go.StreamingHandlerFunc) connect_go.StreamingHandlerFunc {
-	return func(ctx context.Context, conn connect_go.StreamingHandlerConn) error {
+func (i ContentTypeInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		if err := i.checkContentType(conn.RequestHeader()); err != nil {
 			return err
 		}

@@ -3,11 +3,11 @@ module github.com/streamingfast/dgrpc
 go 1.21
 
 require (
+	connectrpc.com/connect v1.14.0
+	connectrpc.com/grpchealth v1.3.0
+	connectrpc.com/grpcreflect v1.2.0
+	connectrpc.com/otelconnect v0.7.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.0.0-20221018185641-36f91511cfd7
-	github.com/bufbuild/connect-go v1.8.0
-	github.com/bufbuild/connect-grpchealth-go v1.1.1
-	github.com/bufbuild/connect-grpcreflect-go v1.0.0
-	github.com/bufbuild/connect-opentelemetry-go v0.3.0
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0

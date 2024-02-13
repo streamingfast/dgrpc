@@ -3,8 +3,8 @@ package tracelog
 import (
 	"context"
 
+	"connectrpc.com/connect"
 	gcppropagator "github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator"
-	connect_go "github.com/bufbuild/connect-go"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/streamingfast/logging"
 	sftracing "github.com/streamingfast/sf-tracing"
@@ -56,20 +56,20 @@ type LoggingInterceptor struct {
 }
 
 // WrapUnary implements [Interceptor] by applying the interceptor function.
-func (i LoggingInterceptor) WrapUnary(next connect_go.UnaryFunc) connect_go.UnaryFunc {
-	return func(ctx context.Context, req connect_go.AnyRequest) (connect_go.AnyResponse, error) {
+func (i LoggingInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		ctx = withLogger(ctx, i.logger)
 		return next(ctx, req)
 	}
 }
 
 // Noop
-func (i LoggingInterceptor) WrapStreamingClient(next connect_go.StreamingClientFunc) connect_go.StreamingClientFunc {
+func (i LoggingInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return next
 }
 
-func (i LoggingInterceptor) WrapStreamingHandler(next connect_go.StreamingHandlerFunc) connect_go.StreamingHandlerFunc {
-	return func(ctx context.Context, conn connect_go.StreamingHandlerConn) error {
+func (i LoggingInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		ctx = withLogger(ctx, i.logger)
 		return next(ctx, conn)
 	}

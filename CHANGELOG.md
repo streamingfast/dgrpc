@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Deprecation** The `dgrpc.SimpleHealthCheck` is deprecated uses `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)` option then `go server.Launch()`
 * **Deprecation** The `dgrpc.SimpleHTTPServer` is deprecated sses `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)` then `go server.Launch()` instead.
 * **Deprecation** The `dgrpc.ListenAndServe` is deprecated sses `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)` then `go server.Launch()` instead.
+* move from deprecated `github.com/bufbuild/connect-go` to `connectrpc.com/connect`
 
 ## 2020-03-21
 
