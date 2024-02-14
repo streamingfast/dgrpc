@@ -102,6 +102,7 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 	}
 
 	if options.HealthCheck != nil {
+		mux.Handle("/", http.HandlerFunc(srv.healthCheckHandler))
 		mux.Handle("/healthz", http.HandlerFunc(srv.healthCheckHandler))
 		mux.Handle(grpchealth.NewHandler(grpchealth.NewStaticChecker()))
 	}
