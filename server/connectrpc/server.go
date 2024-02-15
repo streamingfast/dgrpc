@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package connectweb
+package connectrpc
 
 import (
 	"context"
@@ -75,6 +75,7 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		//connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason returning EOF. prometheus disabled
 		otlInterceptor,
 		tracelog.NewConnectLoggingInterceptor(srv.logger),
+		NewErrorsInterceptor(zlog),
 	}, options.ConnectExtraInterceptors...)
 
 	if options.ConnectWebStrictContentType {
