@@ -15,27 +15,37 @@
 package dgrpc
 
 import (
+	"fmt"
 	"time"
 
-	"go.opencensus.io/plugin/ocgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+	xdscreds "google.golang.org/grpc/credentials/xds"
 	"google.golang.org/grpc/keepalive"
 )
 
 // var balancerDialOption = grpc.WithBalancerName(roundrobin.Name)
-var cfg = `
+var roundrobinDialOption = grpc.WithDefaultServiceConfig(`
 {
   "load_balancing_config": { "round_robin": {} }
-}`
-var roundrobinDialOption = grpc.WithDefaultServiceConfig(cfg)
-var insecureDialOption = grpc.WithInsecure()
-var tracingDialOption = grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
+}`)
+var insecureDialOption = grpc.WithTransportCredentials(insecure.NewCredentials())
 var tlsClientDialOption = grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, ""))
 
 var largeRecvMsgSizeCallOption = grpc.MaxCallRecvMsgSize(1024 * 1024 * 1024)
 var hangOnResolveErrorCallOption = grpc.WaitForReady(true)
+var hangOnResolveErrorDialOption = grpc.WithDefaultCallOptions(hangOnResolveErrorCallOption)
+
+type DefaultTransportCredentials struct {
+	grpc.EmptyDialOption
+}
+
+func (d *DefaultTransportCredentials) DialOption() grpc.DialOption {
+	fmt.Println("DefaultTransportCredentials.DialOption")
+	return d.EmptyDialOption
+}
 
 // very lightweight keepalives: see https://www.evanjones.ca/grpc-is-tricky.html
 var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
@@ -44,7 +54,12 @@ var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
 	PermitWithoutStream: false,
 })
 
-// NewInternalClient creates a grpc ClientConn with keep alive, tracing and plain text
+// Deprecated: use [NewInternalClientConn] instead
+func NewInternalClient(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return NewInternalClientConn(remoteAddr, extraOpts...)
+}
+
+// NewInternalClientConn creates a grpc ClientConn with keep alive, tracing and plain text
 // connection (so no TLS involved, the server must also listen to a plain text socket).
 // InternalClient also has the default call option to "WaitForReady", which means
 // that it will hang indefinitely if the provided remote address does not resolve to
@@ -52,59 +67,73 @@ var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
 // "discovery service" mechanisms where the remote endpoint may become ready soon.
 //
 // It's possible to debug low-level message using `export GODEBUG=http2debug=2`.
-func NewInternalClient(remoteAddr string) (*grpc.ClientConn, error) {
-	conn, err := grpc.Dial(
-		remoteAddr,
-		roundrobinDialOption,
-		insecureDialOption,
-		keepaliveDialOption,
-		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
-		grpc.WithDefaultCallOptions(
-			largeRecvMsgSizeCallOption,
-			hangOnResolveErrorCallOption,
-		),
-	)
-	return conn, err
+func NewInternalClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return NewClientConn(remoteAddr, append([]grpc.DialOption{insecureDialOption, hangOnResolveErrorDialOption}, extraOpts...)...)
 }
 
-// NewInternalNoWaitClient creates a grpc ClientConn with keep alive, tracing and plain text
+// Deprecated: use [NewInternalNoWaitClientConn] instead
+func NewInternalNoWaitClient(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return NewInternalNoWaitClientConn(remoteAddr, append([]grpc.DialOption{insecureDialOption}, extraOpts...)...)
+}
+
+// NewInternalNoWaitClientConn creates a grpc ClientConn with keep alive, tracing and plain text
 // connection (so no TLS involved, the server must also listen to a plain text socket).
 // InternalClient does not have the default call option to "WaitForReady", which means
 // that it will not hang indefinitely if the provided remote address does not resolve to
 // any valid endpoint. This is a desired behavior for internal services where the remote endpoint
 // is not managed by a "discovery service" mechanism.
-func NewInternalNoWaitClient(remoteAddr string) (*grpc.ClientConn, error) {
-	conn, err := grpc.Dial(
-		remoteAddr,
-		roundrobinDialOption,
-		insecureDialOption,
-		keepaliveDialOption,
-		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
-		grpc.WithDefaultCallOptions(
-			largeRecvMsgSizeCallOption,
-		),
-	)
-	return conn, err
+func NewInternalNoWaitClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return NewClientConn(remoteAddr, append([]grpc.DialOption{insecureDialOption}, extraOpts...)...)
 }
 
-// NewExternalClient creates a grpc ClientConn with keepalive, tracing and secure TLS
+// Deprecated: use [NewExternalClientConn] instead
 func NewExternalClient(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return NewExternalClientConn(remoteAddr, extraOpts...)
+}
+
+// NewExternalClientConn creates a default gRPC ClientConn with round robin, keepalive, OpenTelemetry tracing,
+// large receive message size (max 1 GiB) and TLS secure credentials configured.
+func NewExternalClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return NewClientConn(remoteAddr, append([]grpc.DialOption{tlsClientDialOption}, extraOpts...)...)
+}
+
+// NewClientConn creates a default gRPC ClientConn with round robin, keepalive, OpenTelemetry tracing and
+// large receive message size (max 1 GiB) configured.
+//
+// If the remoteAddr starts with "xds://", it will use xDS credentials, transport credentials are not
+// configured and default gRPC applies which is full TLS.
+//
+// It accepts extra gRPC DialOptions to be passed to the grpc.Dial function.
+func NewClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{
 		roundrobinDialOption,
 		keepaliveDialOption,
-		tlsClientDialOption,
 		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 		grpc.WithDefaultCallOptions(
 			largeRecvMsgSizeCallOption,
 		),
+	}
+
+	if IsXDSRemoteAddr(remoteAddr) {
+		if GetXDSBootstrapFilename() == "" {
+			return nil, fmt.Errorf("GRPC_XDS_BOOTSTRAP environment var must be set when using 'xds://' remote addr (%q)", remoteAddr)
+		}
+
+		creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create xDS credentials: %v", err)
+		}
+
+		opts = append(opts, grpc.WithTransportCredentials(creds))
 	}
 
 	if len(extraOpts) > 0 {
 		opts = append(opts, extraOpts...)
 	}
+
+	fmt.Println("Append default transport credentails")
+	opts = append(opts, DefaultTransportCredentials{})
 
 	return grpc.Dial(remoteAddr, opts...)
 }

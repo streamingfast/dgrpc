@@ -2,8 +2,8 @@ package traffic_director
 
 import (
 	"fmt"
-	"log"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -46,7 +46,9 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 	if useXDSCreds {
 		var err error
 		if creds, err = xdscreds.NewServerCredentials(xdscreds.ServerOptions{FallbackCreds: insecure.NewCredentials()}); err != nil {
-			log.Fatalf("failed to create trafficDirectorServer-side xDS credentials: %v", err)
+			logger.Error("failed to create trafficDirectorServer-side xDS credentials", zap.Error(err))
+			logger.Sync()
+			os.Exit(1)
 		}
 	}
 
@@ -92,14 +94,7 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 		grpc_middleware.WithStreamServerChain(streamInterceptors...),
 	}
 
-	for _, opt := range options.ServerOptions {
-		opts = append(opts, opt)
-	}
-
-	//	options.ServerOptions...
-	grpcXDSServer, err := xds.NewGRPCServer(
-		opts...,
-	)
+	grpcXDSServer, err := xds.NewGRPCServer(append(opts, options.ServerOptions...)...)
 	if err != nil {
 		panic(fmt.Errorf("creating grpc server: %w", err))
 	}
