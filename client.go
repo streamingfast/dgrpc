@@ -35,15 +35,6 @@ var largeRecvMsgSizeCallOption = grpc.MaxCallRecvMsgSize(1024 * 1024 * 1024)
 var hangOnResolveErrorCallOption = grpc.WaitForReady(true)
 var hangOnResolveErrorDialOption = grpc.WithDefaultCallOptions(hangOnResolveErrorCallOption)
 
-type DefaultTransportCredentials struct {
-	grpc.EmptyDialOption
-}
-
-func (d *DefaultTransportCredentials) DialOption() grpc.DialOption {
-	fmt.Println("DefaultTransportCredentials.DialOption")
-	return d.EmptyDialOption
-}
-
 // very lightweight keepalives: see https://www.evanjones.ca/grpc-is-tricky.html
 var keepaliveDialOption = grpc.WithKeepaliveParams(keepalive.ClientParameters{
 	Time:                5 * time.Minute, // send pings every ... when there is no activity
@@ -128,9 +119,6 @@ func NewClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.Clien
 	if len(extraOpts) > 0 {
 		opts = append(opts, extraOpts...)
 	}
-
-	fmt.Println("Append default transport credentails")
-	opts = append(opts, DefaultTransportCredentials{})
 
 	return grpc.Dial(remoteAddr, opts...)
 }
