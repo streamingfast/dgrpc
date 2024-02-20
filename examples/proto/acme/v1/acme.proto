@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package acme.v1;
+option go_package = "github.com/streamingfast/dgrpc/examples/pb/acme/v1;pbacme";
+
+service PingPong {
+  rpc GetPing(GetPingRequest) returns (PingResponse);
+
+  rpc StreamPing(StreamPingRequest) returns (stream PingResponse);
+}
+
+message GetPingRequest {
+    string client_id = 1;
+    string message = 2;
+    uint64 response_delay_in_millis = 3;
+}
+
+message StreamPingRequest {
+    string client_id = 1;
+    string message = 2;
+    uint64 response_delay_in_millis = 3;
+    uint64 terminates_after_millis = 4;
+}
+
+message PingResponse {
+    string server_id = 1;
+    string message = 2;
+}
