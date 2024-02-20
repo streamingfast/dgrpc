@@ -58,10 +58,7 @@ func runClient(nodeID string, remoteAddr string) {
 	logger := zlogClient.With(zap.String("node_id", nodeID))
 	logger.Info("creating client", zap.String("remote_addr", remoteAddr))
 
-	conn, err := dgrpc.NewInternalClientConn(remoteAddr, grpc.WithDefaultServiceConfig(`
-	{
-	  "load_balancing_config": { "round_robin": {} }
-	}`))
+	conn, err := dgrpc.NewInternalClientConn(remoteAddr)
 	ensureNoError(err, "Unable to create client conn at %q", remoteAddr)
 	defer conn.Close()
 

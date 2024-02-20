@@ -27,10 +27,7 @@ import (
 )
 
 // var balancerDialOption = grpc.WithBalancerName(roundrobin.Name)
-var roundrobinDialOption = grpc.WithDefaultServiceConfig(`
-{
-  "load_balancing_config": { "round_robin": {} }
-}`)
+var roundrobinDialOption = grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`)
 var insecureDialOption = grpc.WithTransportCredentials(insecure.NewCredentials())
 var tlsClientDialOption = grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, ""))
 
