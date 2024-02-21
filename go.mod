@@ -13,6 +13,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/rs/cors v1.8.3
+	github.com/sercand/kuberesolver/v5 v5.1.1
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
 	github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52
@@ -70,8 +71,6 @@ require (
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.0 // indirect
-	github.com/sercand/kuberesolver v2.4.0+incompatible // indirect
-	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.9.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.23.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.23.1 // indirect

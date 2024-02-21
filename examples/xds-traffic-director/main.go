@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"github.com/streamingfast/dgrpc"
 	pbacme "github.com/streamingfast/dgrpc/examples/pb/acme/v1"
 	"github.com/streamingfast/dgrpc/server"
@@ -21,15 +20,11 @@ import (
 )
 
 var zlog, _ = logging.PackageLogger("main", "github.com/streamingfast/dgrpc/examples/xds-traffic-director_main")
-var zlogGRPC, _ = logging.PackageLogger("grpc", "github.com/streamingfast/dgrpc/examples/xds-traffic-director_grpc")
 var zlogClient, _ = logging.PackageLogger("client", "github.com/streamingfast/dgrpc/examples/xds-traffic-director_client")
 var zlogServer, _ = logging.PackageLogger("server", "github.com/streamingfast/dgrpc/examples/xds-traffic-director_server")
 
 func init() {
 	logging.InstantiateLoggers(logging.WithDefaultSpec(".*=info", "github.com/streamingfast/dgrpc/examples/xds-traffic-director_grpc=warn"))
-	zap.RedirectStdLogAt(zlog, zap.InfoLevel)
-	grpc_zap.ReplaceGrpcLoggerV2WithVerbosity(zlogGRPC, 0)
-
 }
 
 func main() {

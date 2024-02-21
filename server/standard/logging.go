@@ -15,15 +15,7 @@
 package standard
 
 import (
-	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"github.com/streamingfast/logging"
 )
 
 var zlog, _ = logging.PackageLogger("dgrpc", "github.com/streamingfast/dgrpc")
-var zlogGRPC, _ = logging.PackageLogger("dgrpc", "github.com/streamingfast/dgrpc/internal_grpc")
-
-func init() {
-	// Level 0 verbosity in grpc-go less chatty
-	// https://github.com/grpc/grpc-go/blob/master/Documentation/log_levels.md
-	grpc_zap.ReplaceGrpcLoggerV2(zlogGRPC)
-}

@@ -15,19 +15,25 @@ func ServerFromOptions(opts ...server.Option) server.Server {
 		opt(options)
 	}
 
+	logger := options.Logger
+	if logger == nil {
+		logger = zlog
+	}
+
 	if options.ServiceDiscoveryURL != nil {
 		u := options.ServiceDiscoveryURL
 		switch u.Scheme {
 		case "traffic-director", "xds":
 			clientOnly := strings.ToUpper(u.Query().Get("client_only")) == "TRUE"
 			if !clientOnly {
-				zlog.Info("launching traffic director base server", zap.Stringer("url", u))
+				logger.Info("launching traffic director base server", zap.Stringer("url", u))
 				return traffic_director.NewServer(options)
 			}
-			zlog.Info("traffic director url is for client only")
+
+			logger.Info("traffic director url is for client only")
 		}
 	}
 
-	zlog.Info("standard server created")
+	logger.Info("standard server created")
 	return standard.NewServer(options)
 }
