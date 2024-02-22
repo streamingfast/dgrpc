@@ -74,17 +74,31 @@ func WithSecureServer(config SecureTLSConfig) Option {
 	}
 }
 
-// WithCORS Will apply the CORS policy to your server
-// Only works with connectweb servers
+// Deprecated: Use WithConnectCORS instead
 func WithCORS(c *cors.Cors) Option {
+	return WithConnectCORS(c)
+}
+
+// WithConnectCORS Will apply the CORS policy to your server.
+//
+// **Important** Only taken into consideration by'dgrpc/server/connectrpc#Server' server, ignored by all other
+// server implementations.
+func WithConnectCORS(c *cors.Cors) Option {
 	return func(options *Options) {
 		options.ConnectWebCORS = c
 	}
 }
 
-// WithPermissiveCORS is for development environments, as it disables any CORS validation
-// Only works with connectweb servers
+// Deprecated: Use WithConnectPermissiveCORS instead
 func WithPermissiveCORS() Option {
+	return WithConnectPermissiveCORS()
+}
+
+// WithConnectPermissiveCORS is for development environments, as it disables any CORS validation.
+//
+// **Important** Only taken into consideration by'dgrpc/server/connectrpc#Server' server, ignored by all other
+// server implementations.
+func WithConnectPermissiveCORS() Option {
 	return func(options *Options) {
 		options.ConnectWebCORS = cors.New(cors.Options{
 			AllowedMethods: []string{
@@ -120,9 +134,19 @@ func WithPermissiveCORS() Option {
 	}
 }
 
-// WithReflection enables GRPC reflection for the given location string. It be called multiple times
-// Only works with connectweb servers
+// Deprecated: Use WithConnectReflection instead
 func WithReflection(location string) Option {
+	return func(options *Options) {
+		options.ConnectWebReflectionServices = append(options.ConnectWebReflectionServices, location)
+	}
+}
+
+// WithConnectReflection enables gRPC reflection for the given location string. Can be provided multipe
+// times to enable provide reflection for multiple services.
+//
+// **Important** Only taken into consideration by'dgrpc/server/connectrpc#Server' server, ignored by all other
+// server implementations.
+func WithConnectReflection(location string) Option {
 	return func(options *Options) {
 		options.ConnectWebReflectionServices = append(options.ConnectWebReflectionServices, location)
 	}
@@ -219,6 +243,9 @@ func WithPostStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option 
 
 // WithConnectInterceptor option can be used to add your own `connectWeb interceptor`
 // after all others defined automatically by the package.
+//
+// **Important** Only taken into consideration by'dgrpc/server/connectrpc#Server' server, ignored by all other
+// server implementations.
 func WithConnectInterceptor(interceptor connect.Interceptor) Option {
 	return func(options *Options) {
 		options.ConnectExtraInterceptors = append(options.ConnectExtraInterceptors, interceptor)
@@ -226,6 +253,9 @@ func WithConnectInterceptor(interceptor connect.Interceptor) Option {
 }
 
 // WithConnectStrictContentType option can be used to enforce valid content-type
+//
+// **Important** Only taken into consideration by'dgrpc/server/connectrpc#Server' server, ignored by all other
+// server implementations.
 func WithConnectStrictContentType(allowJSON bool) Option {
 	return func(options *Options) {
 		options.ConnectWebStrictContentType = true
@@ -257,8 +287,11 @@ func OverrideTraceID() Option {
 }
 
 // WithConnectStrictContentType option can be used to add http hanlders to the connect web server
-// these handlers will be added to the router AFTER the connect-web handlers, and thus have a lower
-// priority than the connect-web handlers
+// these handlers will be added to the router AFTER the 'connectrpc' handlers, and thus have a lower
+// priority than the 'connectrpc' handlers
+//
+// **Important** Only taken into consideration by'dgrpc/server/connectrpc#Server' server, ignored by all other
+// server implementations.
 func WithConnectWebHTTPHandlers(handlerGetters []HTTPHandlerGetter) Option {
 	return func(options *Options) {
 		options.ConnectWebHTTPHandlers = handlerGetters
