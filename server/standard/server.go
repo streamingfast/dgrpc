@@ -147,8 +147,12 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 			return
 		}
 
+		h2s := &http2.Server{
+			MaxConcurrentStreams: 1000,
+		}
+
 		s.httpServer = &http.Server{
-			Handler:  grpcRouter,
+			Handler:  h2c.NewHandler(grpcRouter, h2s),
 			ErrorLog: errorLogger,
 		}
 
@@ -161,9 +165,6 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 			}
 		} else if s.options.IsPlainText {
 			s.logger().Info("serving gRPC (over HTTP router) (plain-text)", zap.String("listen_addr", serverListenerAddress))
-
-			h2s := &http2.Server{}
-			s.httpServer.Handler = h2c.NewHandler(grpcRouter, h2s)
 
 			if err := s.httpServer.Serve(tcpListener); err != nil {
 				s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))

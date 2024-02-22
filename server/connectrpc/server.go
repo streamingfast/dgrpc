@@ -27,8 +27,6 @@ import (
 	"connectrpc.com/grpcreflect"
 	"connectrpc.com/otelconnect"
 	gmux "github.com/gorilla/mux"
-
-	//	connect_go_prometheus "github.com/easyCZ/connect-go-prometheus"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/tracelog"
 	"github.com/streamingfast/shutter"
@@ -119,7 +117,9 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		handler = options.ConnectWebCORS.Handler(mux)
 	}
 
-	srv.handler = h2c.NewHandler(handler, &http2.Server{})
+	srv.handler = h2c.NewHandler(handler, &http2.Server{
+		MaxConcurrentStreams: 1000,
+	})
 
 	return srv
 }
