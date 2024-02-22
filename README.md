@@ -20,7 +20,8 @@ If `GRPC_REGISTER_ZAP_LOGGER` was set on startup (any value is accepted), you sh
 > [!NOTE]
 > We do not register the zap logger into gRPC stack on program initialization because it prints a lot of warning which would most probably clutter the logs by default. It make sense to set `GRPC_REGISTER_ZAP_LOGGER` by default if you provide a spec that ignores logs from `google.golang.org/grpc` by default.
 
-Once `GRPC_REGISTER_ZAP_LOGGER` is set, use standard `logging` spec like `DLOG="google.golang.org/grpc=debug"` and you will see logs appearing. At any moment you can call `dgrpc.SetGRPCLogger` (or `dgrpc.SetGRPCLoggerWithVerbosity`) to override the active `grpc-go` `*zap.Logger` with your own.
+Once `GRPC_REGISTER_ZAP_LOGGER` is set, use standard `logging` spec like `DLOG="google.golang.org/grpc=debug"` and you will see logs appearing.
+At any moment you can call `dgrpc.SetGRPCLogger` (or `dgrpc.SetGRPCLoggerWithVerbosity`) to override the active `grpc-go` `*zap.Logger` with your own.
 
 ## Notes
 
