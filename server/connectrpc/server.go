@@ -73,7 +73,6 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		//connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason returning EOF. prometheus disabled
 		otlInterceptor,
 		tracelog.NewConnectLoggingInterceptor(srv.logger),
-		NewErrorsInterceptor(zlog),
 	}, options.ConnectExtraInterceptors...)
 
 	if options.ConnectWebStrictContentType {
