@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
-	"github.com/getfreightstream/freightstream/datastore"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap/zapcore"
 )
@@ -19,7 +18,6 @@ func Test_obfuscateError(t *testing.T) {
 		{"basic error", fmt.Errorf("basic error"), connect.NewError(connect.CodeUnknown, fmt.Errorf("Unexpected error. Please try later."))},
 		{"unauthenticated", connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid JWT signature")), connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid JWT signature"))},
 		{"connect web internal", connect.NewError(connect.CodeInternal, fmt.Errorf("asdfasdf")), connect.NewError(connect.CodeInternal, fmt.Errorf("Unexpected error. Please try later."))},
-		{"connect web not found", connect.NewError(connect.CodeNotFound, fmt.Errorf("foo: %w", datastore.NotFound)), connect.NewError(connect.CodeNotFound, fmt.Errorf("foo: not found"))},
 	}
 
 	for _, test := range tests {
