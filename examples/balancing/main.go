@@ -28,7 +28,7 @@ func init() {
 	logging.InstantiateLoggers(logging.WithDefaultSpec(".*=info", "google.golang.org/grpc=-"))
 
 	// Register some extra gRPC resolvers
-	dgrpc.RegisterKubernetesResolver()
+	dgrpc.RegisterKubernetesResolver("kubernetes")
 }
 
 var usage = `Usage: go run . (client <id> <remote-addr>|server <id> <listen-addr>) [<discovery-service-url>]

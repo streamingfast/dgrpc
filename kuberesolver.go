@@ -17,6 +17,13 @@ func init() {
 // to github.com/sercand/kuberesolver/v5 for more information about the `kubernetes:///` gRPC
 // resolver.
 //
+// The `customScheme` is the scheme that will be used to register the resolver. It's usually
+// `kubernetes` and should be performed close to the initialization of the application.
+//
+//	func main() {
+//	    dgrpc.RegisterKubernetesResolver("kubernetes")
+//	}
+//
 // **Important** The 'dgrpc' library already registers the kubernetes resolver with the 'kubernetes' scheme.
 // so it's not necessary to call this function unless you want to use a different scheme. You can define
 // the variable `GRPC_REGISTER_KUBERNETES_RESOLVER` to `false` to prevent the automatic registration.

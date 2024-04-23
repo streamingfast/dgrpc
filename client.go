@@ -15,6 +15,7 @@
 package dgrpc
 
 import (
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -120,4 +121,77 @@ func NewClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.Clien
 	}
 
 	return grpc.Dial(remoteAddr, opts...)
+}
+
+// WithAutoTransportCredentials returns a [grpc.DialOption] that automatically selects the right transport credentials
+// based on the provided parameters.
+//
+// The various combinations are exclusive, it's invalid to set more than one to true. If more than one is set to true,
+// the function will panic.
+//
+// If insecureTLS is true, it will configures [grpc.DialOption] as:
+//
+//	grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))
+//
+// If plainText is true, it will configures [grpc.DialOption] as:
+//
+//	grpc.WithTransportCredentials(insecure.NewCredentials())
+//
+// If xds is true, it will configures [grpc.DialOption] as:
+//
+//	xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
+//
+// And will panic if the GRPC_XDS_BOOTSTRAP environment variable is not set nor if the
+// xdscreds.NewClientCredentials call fails.
+func WithAutoTransportCredentials(insecureTLS bool, plainText bool, xds bool) grpc.DialOption {
+	if moreThanOneTrue(insecureTLS, plainText, xds) {
+		panic(fmt.Errorf("only one of insecureTLS, plainText or xds can be set to true, those are mutually exlusive"))
+	}
+
+	getCreds := func() credentials.TransportCredentials {
+		if xds {
+			creds, err := newXdsClientCredentials()
+			if err != nil {
+				panic(fmt.Errorf("option AutoTransportCredentials(..., xds: true) failed to create xDS credentials: %w", err))
+			}
+
+			return creds
+		}
+
+		if plainText {
+			return insecure.NewCredentials()
+		}
+
+		if insecureTLS {
+			return credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})
+		}
+
+		return credentials.NewClientTLSFromCert(nil, "")
+	}
+
+	return grpc.WithTransportCredentials(getCreds())
+}
+
+func newXdsClientCredentials() (credentials.TransportCredentials, error) {
+	if GetXDSBootstrapFilename() == "" {
+		return nil, fmt.Errorf("GRPC_XDS_BOOTSTRAP environment var must be set")
+	}
+
+	creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create xDS credentials: %w", err)
+	}
+
+	return creds, nil
+}
+
+func moreThanOneTrue(values ...bool) bool {
+	countTrue := 0
+	for _, v := range values {
+		if v {
+			countTrue++
+		}
+	}
+
+	return countTrue > 1
 }
