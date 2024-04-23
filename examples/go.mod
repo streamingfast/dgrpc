@@ -6,7 +6,7 @@ toolchain go1.22.0
 
 require (
 	github.com/streamingfast/cli v0.0.4-0.20240412191021-5f81842cb71d
-	github.com/streamingfast/dgrpc v0.0.0-20240423140441-746a107d136e
+	github.com/streamingfast/dgrpc v0.0.0-20240423140525-c716968b7738
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	go.uber.org/atomic v1.10.0
 	go.uber.org/zap v1.21.0

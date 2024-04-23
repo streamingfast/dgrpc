@@ -19,7 +19,12 @@ func main() {
 
 	// Show case creating a client connection to a server running on localhost:9000 with auto transport credentials.
 	// This enables easy configuration of transport security based on 3 parameters, check the method signature for more details.
-	connection, err := dgrpc.NewClientConn("localhost:9000", dgrpc.WithAutoTransportCredentials(false, true, false))
+	//
+	// The alternative panicking version [dgrpc.WithMustAutoTransportCredentials] could be used if you want to panic on error.
+	credsOption, err := dgrpc.WithAutoTransportCredentials(false, true, false)
+	cli.NoError(err, "unable to create auto transport credentials option")
+
+	connection, err := dgrpc.NewClientConn("localhost:9000", credsOption)
 	cli.NoError(err, "unable to create external client")
 	defer func() {
 		if err := connection.Close(); err != nil {
