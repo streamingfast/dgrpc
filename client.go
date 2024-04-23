@@ -123,7 +123,45 @@ func NewClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.Clien
 	return grpc.Dial(remoteAddr, opts...)
 }
 
-// WithAutoTransportCredentials returns a [grpc.DialOption] that automatically selects the right transport credentials
+// WithAutoTransportCredentials returns a [grpc.DialOption] that automatically selects the right transport credentials.
+// It has the same behavior as [WithMustAutoTransportCredentials] but returns an error instead of panicking.
+//
+// Refer to [WithMustAutoTransportCredentials] for detailled information about the various combinations.
+func WithAutoTransportCredentials(insecureTLS bool, plainText bool, xds bool) (grpc.DialOption, error) {
+	if moreThanOneTrue(insecureTLS, plainText, xds) {
+		return nil, fmt.Errorf("only one of insecureTLS, plainText or xds can be set to true, those are mutually exlusive")
+	}
+
+	getCreds := func() (credentials.TransportCredentials, error) {
+		if xds {
+			creds, err := newXdsClientCredentials()
+			if err != nil {
+				return nil, fmt.Errorf("option AutoTransportCredentials(..., xds: true) failed to create xDS credentials: %w", err)
+			}
+
+			return creds, nil
+		}
+
+		if plainText {
+			return insecure.NewCredentials(), nil
+		}
+
+		if insecureTLS {
+			return credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}), nil
+		}
+
+		return credentials.NewClientTLSFromCert(nil, ""), nil
+	}
+
+	creds, err := getCreds()
+	if err != nil {
+		return nil, err
+	}
+
+	return grpc.WithTransportCredentials(creds), nil
+}
+
+// WithMustAutoTransportCredentials returns a [grpc.DialOption] that automatically selects the right transport credentials
 // based on the provided parameters.
 //
 // The various combinations are exclusive, it's invalid to set more than one to true. If more than one is set to true,
@@ -143,33 +181,13 @@ func NewClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.Clien
 //
 // And will panic if the GRPC_XDS_BOOTSTRAP environment variable is not set nor if the
 // xdscreds.NewClientCredentials call fails.
-func WithAutoTransportCredentials(insecureTLS bool, plainText bool, xds bool) grpc.DialOption {
-	if moreThanOneTrue(insecureTLS, plainText, xds) {
-		panic(fmt.Errorf("only one of insecureTLS, plainText or xds can be set to true, those are mutually exlusive"))
+func WithMustAutoTransportCredentials(insecureTLS bool, plainText bool, xds bool) grpc.DialOption {
+	option, err := WithAutoTransportCredentials(insecureTLS, plainText, xds)
+	if err != nil {
+		panic(err)
 	}
 
-	getCreds := func() credentials.TransportCredentials {
-		if xds {
-			creds, err := newXdsClientCredentials()
-			if err != nil {
-				panic(fmt.Errorf("option AutoTransportCredentials(..., xds: true) failed to create xDS credentials: %w", err))
-			}
-
-			return creds
-		}
-
-		if plainText {
-			return insecure.NewCredentials()
-		}
-
-		if insecureTLS {
-			return credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})
-		}
-
-		return credentials.NewClientTLSFromCert(nil, "")
-	}
-
-	return grpc.WithTransportCredentials(getCreds())
+	return option
 }
 
 func newXdsClientCredentials() (credentials.TransportCredentials, error) {
