@@ -5,6 +5,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add zstd support for connectrpc server
 - Remove connectrpc error middleware by default. You need to add it `connectrpc.NewErrorsInterceptor`
 - Added abiliy to map connectrpc error
 - Removed `WithAuthChecker` support. Use `PostUnaryInterceptors` & `PostStreamInterceptors` to add an authentication interceptor
