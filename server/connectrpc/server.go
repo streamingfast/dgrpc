@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"connectrpc.com/grpcreflect"
 	"connectrpc.com/otelconnect"
 	gmux "github.com/gorilla/mux"
+	"github.com/klauspost/compress/zstd"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/tracelog"
 	"github.com/streamingfast/shutter"
@@ -81,6 +83,7 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 
 	var connectOpts []connect.HandlerOption
 	connectOpts = append(connectOpts, connect.WithInterceptors(interceptors...))
+	connectOpts = append(connectOpts, connect.WithCompression("zstd", getZstdDecompressor, getZstdCompressor))
 
 	mux := gmux.NewRouter()
 
@@ -250,4 +253,53 @@ func (i ContentTypeInterceptor) WrapStreamingHandler(next connect.StreamingHandl
 		}
 		return next(ctx, conn)
 	}
+}
+
+type zstdDecompressor struct {
+	*zstd.Decoder
+}
+
+func (dec *zstdDecompressor) Close() error {
+	if dec.Decoder == nil {
+		return nil
+	}
+	return dec.Decoder.Reset(nil)
+}
+
+func (dec *zstdDecompressor) Reset(r io.Reader) error {
+	if dec.Decoder == nil {
+		d, err := zstd.NewReader(r)
+		dec.Decoder = d
+		return err
+	}
+	return dec.Decoder.Reset(r)
+}
+
+func getZstdDecompressor() connect.Decompressor {
+	return &zstdDecompressor{}
+}
+
+type zstdCompressor struct {
+	*zstd.Encoder
+}
+
+func (dec *zstdCompressor) Close() error {
+	if dec.Encoder == nil {
+		return nil
+	}
+	return dec.Encoder.Close()
+}
+
+func (dec *zstdCompressor) Reset(w io.Writer) {
+	if dec.Encoder == nil {
+		e, _ := zstd.NewWriter(w)
+		dec.Encoder = e
+		return
+	}
+	dec.Encoder.Reset(w)
+
+}
+
+func getZstdCompressor() connect.Compressor {
+	return &zstdCompressor{}
 }

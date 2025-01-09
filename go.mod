@@ -12,6 +12,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
+	github.com/klauspost/compress v1.16.6
 	github.com/rs/cors v1.8.3
 	github.com/sercand/kuberesolver/v5 v5.1.1
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a
