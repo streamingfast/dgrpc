@@ -21,7 +21,7 @@ func init() {
 			propagation.TraceContext{},
 			RandomTraceGetter{}, // add a random traceID if there is none yet
 			propagation.Baggage{},
-			gcppropagator.CloudTraceFormatPropagator{}, // X-Cloud-Trace-Context instead of traceparent
+			gcppropagator.CloudTraceFormatPropagator{}, // X-Cloud-Trace-Context takes precedence over traceparent
 		))
 }
 
