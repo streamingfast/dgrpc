@@ -97,18 +97,28 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		mux.PathPrefix(path).Handler(handler)
 	}
 
+	if options.HealthCheck != nil {
+		mux.Handle("/", http.HandlerFunc(srv.healthCheckHandler))
+		mux.Handle("/healthz", http.HandlerFunc(srv.healthCheckHandler))
+		path, handler := grpchealth.NewHandler(grpchealth.NewStaticChecker())
+		mux.PathPrefix(path).Handler(handler)
+		var healthCheckIncluded bool
+		for _, cwrs := range options.ConnectWebReflectionServices {
+			if cwrs == "grpc.health.v1.Health/Fetch" {
+				healthCheckIncluded = true
+				break
+			}
+		}
+		if !healthCheckIncluded {
+			options.ConnectWebReflectionServices = append(options.ConnectWebReflectionServices, "grpc.health.v1.Health/Fetch")
+		}
+	}
+
 	if len(options.ConnectWebReflectionServices) != 0 {
 		reflector := grpcreflect.NewStaticReflector(options.ConnectWebReflectionServices...)
 		path, handler := grpcreflect.NewHandlerV1(reflector)
 		mux.PathPrefix(path).Handler(handler)
 		path, handler = grpcreflect.NewHandlerV1Alpha(reflector)
-		mux.PathPrefix(path).Handler(handler)
-	}
-
-	if options.HealthCheck != nil {
-		mux.Handle("/", http.HandlerFunc(srv.healthCheckHandler))
-		mux.Handle("/healthz", http.HandlerFunc(srv.healthCheckHandler))
-		path, handler := grpchealth.NewHandler(grpchealth.NewStaticChecker())
 		mux.PathPrefix(path).Handler(handler)
 	}
 
