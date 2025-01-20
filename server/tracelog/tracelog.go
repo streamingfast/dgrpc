@@ -18,12 +18,10 @@ func init() {
 	// https://pkg.go.dev/github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator#section-readme
 	otel.SetTextMapPropagator(
 		propagation.NewCompositeTextMapPropagator(
-			// Putting the CloudTraceOneWayPropagator first means the TraceContext propagator
-			// takes precedence if both the traceparent and the XCTC headers exist.
-			gcppropagator.CloudTraceOneWayPropagator{}, // X-Cloud-Trace-Context instead of traceparent
 			propagation.TraceContext{},
 			RandomTraceGetter{}, // add a random traceID if there is none yet
 			propagation.Baggage{},
+			gcppropagator.CloudTraceFormatPropagator{}, // X-Cloud-Trace-Context instead of traceparent
 		))
 }
 
