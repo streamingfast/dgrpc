@@ -72,15 +72,17 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		srv.Shutdown(fmt.Errorf("unable to create otel interceptor: %w", err))
 		return nil
 	}
-	interceptors := append([]connect.Interceptor{
-		//connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason returning EOF. prometheus disabled
-		otlInterceptor,
-		tracelog.NewConnectLoggingInterceptor(srv.logger),
-	}, options.ConnectExtraInterceptors...)
+	var interceptors []connect.Interceptor
 
 	if options.ConnectWebStrictContentType {
 		interceptors = append(interceptors, ContentTypeInterceptor{allowJSON: options.ConnectWebAllowJSON})
 	}
+	interceptors = append(interceptors,
+		//connect_go_prometheus.NewInterceptor(), // FIXME this breaks the stream for some reason returning EOF. prometheus disabled
+		otlInterceptor,
+		tracelog.NewConnectLoggingInterceptor(srv.logger),
+	)
+	interceptors = append(interceptors, options.ConnectExtraInterceptors...)
 
 	var connectOpts []connect.HandlerOption
 	connectOpts = append(connectOpts, connect.WithInterceptors(interceptors...))
@@ -249,6 +251,14 @@ func (i ContentTypeInterceptor) WrapStreamingClient(next connect.StreamingClient
 
 func (i ContentTypeInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		headers := conn.RequestHeader()
+		if tracing.Enabled() {
+			hh := []string{}
+			for k, v := range headers {
+				hh = append(hh, k+": "+strings.Join(v, ","))
+			}
+			zlog.Debug("got request with headers", zap.String("headers", strings.Join(hh, ",")))
+		}
 		if err := i.checkContentType(conn.RequestHeader()); err != nil {
 			return err
 		}
