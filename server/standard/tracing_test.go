@@ -18,13 +18,14 @@ import (
 	"context"
 	"testing"
 
-	"go.uber.org/zap"
-
-	"github.com/streamingfast/dtracing"
+	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
 )
 
 func Test_withTraceId(t *testing.T) {
+	var tracer = otel.Tracer("test")
 
 	var tests = []struct {
 		name              string
@@ -44,7 +45,7 @@ func Test_withTraceId(t *testing.T) {
 			name:            "with override trace id, context with trace id ",
 			overrideTraceID: true,
 			contextFunc: func() context.Context {
-				ctx, _ := dtracing.StartFreshSpan(context.Background(), "Testing")
+				ctx, _ := tracer.Start(context.Background(), "Testing")
 				return ctx
 			},
 			expectTraceIddiff: true,
@@ -61,7 +62,7 @@ func Test_withTraceId(t *testing.T) {
 			name:            "without override trace id, context with trace id ",
 			overrideTraceID: false,
 			contextFunc: func() context.Context {
-				ctx, _ := dtracing.StartFreshSpan(context.Background(), "Testing")
+				ctx, _ := tracer.Start(context.Background(), "Testing")
 				return ctx
 			},
 			expectTraceIddiff: false,
@@ -73,8 +74,8 @@ func Test_withTraceId(t *testing.T) {
 			inputCtx := test.contextFunc()
 			outputCtx := withTraceID(inputCtx, zlog, test.overrideTraceID)
 
-			inputTraceID := dtracing.GetTraceID(inputCtx)
-			outputTraceID := dtracing.GetTraceID(outputCtx)
+			inputTraceID := tracing.GetTraceID(inputCtx)
+			outputTraceID := tracing.GetTraceID(outputCtx)
 			if test.expectTraceIddiff {
 				assert.NotEqual(t, inputTraceID, outputTraceID)
 			} else {

@@ -18,13 +18,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/streamingfast/dtracing"
 	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 )
 
 func Test_withLogger(t *testing.T) {
+	var tracer = otel.Tracer("tests")
 
 	var tests = []struct {
 		name              string
@@ -44,7 +45,7 @@ func Test_withLogger(t *testing.T) {
 			name:            "with override trace id, context with trace id ",
 			overrideTraceId: true,
 			contextFunc: func() context.Context {
-				ctx, _ := dtracing.StartFreshSpan(context.Background(), "Testing")
+				ctx, _ := tracer.Start(context.Background(), "Testing")
 				return ctx
 			},
 			expectTraceIddiff: true,
@@ -61,7 +62,7 @@ func Test_withLogger(t *testing.T) {
 			name:            "without override trace id, context with trace id ",
 			overrideTraceId: false,
 			contextFunc: func() context.Context {
-				ctx, _ := dtracing.StartFreshSpan(context.Background(), "Testing")
+				ctx, _ := tracer.Start(context.Background(), "Testing")
 				return ctx
 			},
 			expectTraceIddiff: false,

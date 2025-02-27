@@ -18,58 +18,65 @@ import (
 	"context"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-
-	"google.golang.org/grpc"
-
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"github.com/streamingfast/dtracing"
-	"go.opencensus.io/trace"
+	tracing "github.com/streamingfast/sf-tracing"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
+
+var tracer = otel.Tracer("dgrpc/server/standard")
 
 func SetupTracingInterceptors(logger *zap.Logger, overrideTraceID bool) (grpc.UnaryServerInterceptor, grpc.StreamServerInterceptor) {
 	unaryServerInterceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		reqCtx, endSpan := withTraceID(ctx, logger, overrideTraceID)
+		defer endSpan()
+
 		// In GRPC unary calls we do not want to override the trace id of the load balancer
-		return handler(withTraceID(ctx, logger, overrideTraceID), req)
+		return handler(reqCtx, req)
 	}
 
 	// Same logic as unary interceptor, see comments there for execution flow
 	streamServerInterceptor := func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		reqCtx, endSpan := withTraceID(stream.Context(), logger, overrideTraceID)
+		defer endSpan()
+
 		// In GRPC stream we may want to override the trace id of the load balancer if we the next backend in line... (i.e dgraphql)
 		wrapped := grpc_middleware.WrapServerStream(stream)
-		wrapped.WrappedContext = withTraceID(stream.Context(), logger, overrideTraceID)
+		wrapped.WrappedContext = reqCtx
+
 		return handler(srv, wrapped)
 	}
 
 	return unaryServerInterceptor, streamServerInterceptor
 }
 
-func withTraceID(ctx context.Context, logger *zap.Logger, overrideTraceID bool) context.Context {
+func withTraceID(ctx context.Context, logger *zap.Logger, overrideTraceID bool) (outCtx context.Context, cancel func()) {
 	rootTraceID := ""
-	rootSpan := trace.FromContext(ctx)
-	if rootSpan != nil {
-		rootTraceID = rootSpan.SpanContext().TraceID.String()
+	if traceID := tracing.GetTraceID(ctx); traceID.IsValid() {
+		rootTraceID = traceID.String()
 	}
 
 	// if override trace id is enabled we want to override the trace regardless if there is one or not. This should happen
 	// on the user facing services, for example dgraphql
 	if overrideTraceID {
-		opCtx, span := dtracing.StartFreshSpan(ctx, "grpc")
+		opCtx, span := tracer.Start(ctx, "grpc", trace.WithNewRoot())
+		newTraceID := tracing.GetTraceID(ctx)
 
 		// DO NOT CHANGE THE MESSAGE LOG - FP
 		logger.Info("trace_id_override",
 			zap.String("root_trace_id", rootTraceID),
-			zap.Stringer("trace_id", span.SpanContext().TraceID),
+			zap.Stringer("trace_id", newTraceID),
 		)
 
 		// We add `trace_id` to grcp_zap middleware fields, since in the middleware, those fields are added when logging the gRPC call result
-		ctxzap.AddFields(opCtx, zap.Stringer("trace_id", span.SpanContext().TraceID))
-		return opCtx
+		ctxzap.AddFields(opCtx, zap.Stringer("trace_id", newTraceID))
+		return opCtx, func() { span.End() }
 	}
 
 	// We add `trace_id` to grcp_zap middleware fields, since in the middleware, those fields are added when logging the gRPC call result
 	ctxzap.AddFields(ctx, zap.String("trace_id", rootTraceID))
 
-	return ctx
-
+	return ctx, func() {}
 }
