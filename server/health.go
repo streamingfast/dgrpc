@@ -25,7 +25,11 @@ func (v HealthCheckOver) IsActive(on uint8) bool {
 	return (on & uint8(v)) != 0
 }
 
+var _ pbhealth.HealthServer = &HealthGRPCHandler{}
+
 type HealthGRPCHandler struct {
+	pbhealth.UnimplementedHealthServer
+
 	check HealthCheck
 }
 

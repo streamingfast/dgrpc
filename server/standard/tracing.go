@@ -61,8 +61,14 @@ func withTraceID(ctx context.Context, logger *zap.Logger, overrideTraceID bool) 
 	// if override trace id is enabled we want to override the trace regardless if there is one or not. This should happen
 	// on the user facing services, for example dgraphql
 	if overrideTraceID {
-		opCtx, span := tracer.Start(ctx, "grpc", trace.WithNewRoot())
-		newTraceID := tracing.GetTraceID(ctx)
+		// Force generating a new random trace/span ID and start a new root span
+		opCtx := trace.ContextWithSpanContext(ctx, trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID: tracing.NewRandomTraceID(),
+			SpanID:  tracing.NewRandomSpanID(),
+		}))
+
+		opCtx, span := tracer.Start(opCtx, "grpc", trace.WithNewRoot())
+		newTraceID := tracing.GetTraceID(opCtx)
 
 		// DO NOT CHANGE THE MESSAGE LOG - FP
 		logger.Info("trace_id_override",
@@ -73,6 +79,15 @@ func withTraceID(ctx context.Context, logger *zap.Logger, overrideTraceID bool) 
 		// We add `trace_id` to grcp_zap middleware fields, since in the middleware, those fields are added when logging the gRPC call result
 		ctxzap.AddFields(opCtx, zap.Stringer("trace_id", newTraceID))
 		return opCtx, func() { span.End() }
+	}
+
+	if rootTraceID == "" {
+		randomTraceID := tracing.NewRandomTraceID()
+		ctx = trace.ContextWithSpanContext(ctx, trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID: randomTraceID,
+			SpanID:  tracing.NewRandomSpanID(),
+		}))
+		rootTraceID = randomTraceID.String()
 	}
 
 	// We add `trace_id` to grcp_zap middleware fields, since in the middleware, those fields are added when logging the gRPC call result

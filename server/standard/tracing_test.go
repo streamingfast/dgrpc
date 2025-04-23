@@ -31,7 +31,7 @@ func Test_withTraceId(t *testing.T) {
 		name              string
 		overrideTraceID   bool
 		contextFunc       func() context.Context
-		expectTraceIddiff bool
+		expectTraceIDDiff bool
 	}{
 		{
 			name:            "Context without trace id",
@@ -39,16 +39,17 @@ func Test_withTraceId(t *testing.T) {
 			contextFunc: func() context.Context {
 				return context.Background()
 			},
-			expectTraceIddiff: true,
+			expectTraceIDDiff: true,
 		},
 		{
 			name:            "with override trace id, context with trace id ",
 			overrideTraceID: true,
 			contextFunc: func() context.Context {
 				ctx, _ := tracer.Start(context.Background(), "Testing")
+				ctx = tracing.WithTraceID(ctx, tracing.NewRandomTraceID())
 				return ctx
 			},
-			expectTraceIddiff: true,
+			expectTraceIDDiff: true,
 		},
 		{
 			name:            "without override trace id, context without trace id",
@@ -56,32 +57,35 @@ func Test_withTraceId(t *testing.T) {
 			contextFunc: func() context.Context {
 				return context.Background()
 			},
-			expectTraceIddiff: true,
+			expectTraceIDDiff: true,
 		},
 		{
 			name:            "without override trace id, context with trace id ",
 			overrideTraceID: false,
 			contextFunc: func() context.Context {
 				ctx, _ := tracer.Start(context.Background(), "Testing")
+				ctx = tracing.WithTraceID(ctx, tracing.NewRandomTraceID())
+
 				return ctx
 			},
-			expectTraceIddiff: false,
+			expectTraceIDDiff: false,
 		},
 	}
 	zlog := zap.NewNop()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			inputCtx := test.contextFunc()
-			outputCtx := withTraceID(inputCtx, zlog, test.overrideTraceID)
+			outputCtx, cancel := withTraceID(inputCtx, zlog, test.overrideTraceID)
+			defer cancel()
 
-			inputTraceID := tracing.GetTraceID(inputCtx)
-			outputTraceID := tracing.GetTraceID(outputCtx)
-			if test.expectTraceIddiff {
-				assert.NotEqual(t, inputTraceID, outputTraceID)
+			inputTraceID := tracing.GetTraceID(inputCtx).String()
+			outputTraceID := tracing.GetTraceID(outputCtx).String()
+
+			if test.expectTraceIDDiff {
+				assert.NotEqual(t, inputTraceID, outputTraceID, "Condition %s != %s failed", inputTraceID, outputTraceID)
 			} else {
-				assert.Equal(t, inputTraceID, outputTraceID)
+				assert.Equal(t, inputTraceID, outputTraceID, "Condition %s == %s failed", inputTraceID, outputTraceID)
 			}
-
 		})
 	}
 
