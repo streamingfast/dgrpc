@@ -5,6 +5,7 @@ go 1.22
 toolchain go1.22.0
 
 require (
+	connectrpc.com/connect v1.14.0
 	github.com/streamingfast/cli v0.0.4-0.20240412191021-5f81842cb71d
 	github.com/streamingfast/dgrpc v0.0.0-20250227145635-c7acd8399bea
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
@@ -18,7 +19,9 @@ require (
 	cloud.google.com/go/compute v1.23.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/trace v1.10.4 // indirect
-	connectrpc.com/connect v1.14.0 // indirect
+	connectrpc.com/grpchealth v1.3.0 // indirect
+	connectrpc.com/grpcreflect v1.2.0 // indirect
+	connectrpc.com/otelconnect v0.7.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v0.32.3 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.15.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.39.0 // indirect
@@ -50,6 +53,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
+	github.com/klauspost/compress v1.16.6 // indirect
 	github.com/lithammer/dedent v1.1.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
@@ -106,5 +110,3 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/streamingfast/logging => /Users/maoueh/work/sf/logging

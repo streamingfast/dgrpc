@@ -42,9 +42,6 @@ func NewPingPongConnectServer(id string, logger *zap.Logger) pbacmeconnect.PingP
 
 // GetPing implements Connect PingPongServiceHandler.
 func (p *pingPongConnectServer) GetPing(ctx context.Context, req *connect.Request[pbacme.GetPingRequest]) (*connect.Response[pbacme.PingResponse], error) {
-	// Demonstrate panic recovery:
-	panic("Does Connect panic recovery work?")
-
 	p.activeRequest.Inc()
 	defer p.activeRequest.Dec()
 
