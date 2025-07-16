@@ -1,4 +1,4 @@
-package pbacme
+package impl
 
 import (
 	context "context"
@@ -6,14 +6,15 @@ import (
 	"math"
 	"time"
 
+	pbacme "github.com/streamingfast/dgrpc/examples/internal/pb/acme/v1"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
 
-var _ PingPongServiceServer = &pingPongServiceServerImpl{}
+var _ pbacme.PingPongServiceServer = &pingPongGRPCServer{}
 
-type pingPongServiceServerImpl struct {
-	UnimplementedPingPongServiceServer
+type pingPongGRPCServer struct {
+	pbacme.UnimplementedPingPongServiceServer
 
 	ID     string
 	Logger *zap.Logger
@@ -21,8 +22,8 @@ type pingPongServiceServerImpl struct {
 	activeRequest *atomic.Uint64
 }
 
-func NewPingPongServiceServerImpl(id string, logger *zap.Logger) PingPongServiceServer {
-	s := &pingPongServiceServerImpl{
+func NewPingPongGRPCServer(id string, logger *zap.Logger) pbacme.PingPongServiceServer {
+	s := &pingPongGRPCServer{
 		ID:            id,
 		Logger:        logger,
 		activeRequest: atomic.NewUint64(0),
@@ -41,7 +42,7 @@ func NewPingPongServiceServerImpl(id string, logger *zap.Logger) PingPongService
 }
 
 // GetPing implements PingPongServer.
-func (p *pingPongServiceServerImpl) GetPing(ctx context.Context, req *GetPingRequest) (*PingResponse, error) {
+func (p *pingPongGRPCServer) GetPing(ctx context.Context, req *pbacme.GetPingRequest) (*pbacme.PingResponse, error) {
 	p.activeRequest.Inc()
 	defer p.activeRequest.Dec()
 
@@ -54,14 +55,14 @@ func (p *pingPongServiceServerImpl) GetPing(ctx context.Context, req *GetPingReq
 		time.Sleep(delay)
 	}
 
-	return &PingResponse{
+	return &pbacme.PingResponse{
 		ServerId: p.ID,
 		Message:  fmt.Sprintf("Pong from %s (message from %s - %q)", p.ID, req.ClientId, req.GetMessage()),
 	}, nil
 }
 
 // StreamPing implements PingPongServer.
-func (p *pingPongServiceServerImpl) StreamPing(req *StreamPingRequest, sender PingPongService_StreamPingServer) error {
+func (p *pingPongGRPCServer) StreamPing(req *pbacme.StreamPingRequest, sender pbacme.PingPongService_StreamPingServer) error {
 	p.activeRequest.Inc()
 	defer p.activeRequest.Dec()
 
@@ -94,7 +95,7 @@ func (p *pingPongServiceServerImpl) StreamPing(req *StreamPingRequest, sender Pi
 				time.Sleep(delay)
 			}
 
-			sender.SendMsg(&PingResponse{
+			sender.SendMsg(&pbacme.PingResponse{
 				ServerId: p.ID,
 				Message:  fmt.Sprintf("Pong from %s (message from %s - %q)", p.ID, req.ClientId, req.GetMessage()),
 			})

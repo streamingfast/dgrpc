@@ -95,7 +95,7 @@ type StandardServer struct {
 //
 // **Important** We use `NewServer2` name temporarily while we test the concept, when
 //
-//	we are statisfied with the interface and feature set, the actual
+//	we are satisfied with the interface and feature set, the actual
 //	`NewServer` will be replaced by this implementation.
 func NewServer(options *server.Options) *StandardServer {
 	srv := &StandardServer{
@@ -348,20 +348,36 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 	tracerProvider := otel.GetTracerProvider()
 
 	// Order of interceptors is important here, index order is followed so `{one, two, three}` runs `one` then `two` then `three` passing context along the way
-	streamInterceptors := []grpc.StreamServerInterceptor{
+	streamInterceptors := []grpc.StreamServerInterceptor{}
+	unaryInterceptors := []grpc.UnaryServerInterceptor{}
+
+	// Adds custom defined pre-interceptors first, they run before all others
+	if len(options.PreUnaryInterceptors) > 0 {
+		unaryInterceptors = append(unaryInterceptors, options.PreUnaryInterceptors...)
+	}
+
+	if len(options.PreStreamInterceptors) > 0 {
+		streamInterceptors = append(streamInterceptors, options.PreStreamInterceptors...)
+	}
+
+	// Add default panic isolation interceptors
+	streamInterceptors = append(streamInterceptors, server.IsolateRequestPanicStreamInterceptor(options.Logger))
+	unaryInterceptors = append(unaryInterceptors, server.IsolateRequestPanicUnaryInterceptor(options.Logger))
+
+	// Add standard dgrpc interceptors
+	streamInterceptors = append(streamInterceptors,
 		grpc_ctxtags.StreamServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 		grpc_prometheus.StreamServerInterceptor,
 		otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		zapStreamInterceptor, // zap base server interceptor
-	}
+	)
 
-	// Order of interceptors is important here, index order is followed so `{one, two, three}` runs `one` then `two` then `three` passing context along the way
-	unaryInterceptors := []grpc.UnaryServerInterceptor{
+	unaryInterceptors = append(unaryInterceptors,
 		grpc_ctxtags.UnaryServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 		grpc_prometheus.UnaryServerInterceptor,
 		otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		zapUnaryInterceptor, // zap base server interceptor
-	}
+	)
 
 	// Adds contextualized logger to interceptors, must comes after authenticator since we extract stuff from there is available.
 	// The interceptor tries to extract the `trace_id` from the logger and configure the logger to always use it.

@@ -21,6 +21,8 @@ type Options struct {
 
 	// GRPC-only options
 	ServerOptions            []grpc.ServerOption
+	PreUnaryInterceptors     []grpc.UnaryServerInterceptor
+	PreStreamInterceptors    []grpc.StreamServerInterceptor
 	PostUnaryInterceptors    []grpc.UnaryServerInterceptor
 	PostStreamInterceptors   []grpc.StreamServerInterceptor
 	ConnectExtraInterceptors []connect.Interceptor
@@ -225,6 +227,22 @@ func WithRegisterService(registrator func(gs *grpc.Server)) Option {
 	}
 }
 
+// WithPreUnaryInterceptor option can be used to add your own `grpc.UnaryServerInterceptor`
+// before all others defined automatically by the package.
+func WithPreUnaryInterceptor(interceptor grpc.UnaryServerInterceptor) Option {
+	return func(options *Options) {
+		options.PreUnaryInterceptors = append(options.PreUnaryInterceptors, interceptor)
+	}
+}
+
+// WithPreStreamInterceptor option can be used to add your own `grpc.StreamServerInterceptor`
+// before all others defined automatically by the package.
+func WithPreStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option {
+	return func(options *Options) {
+		options.PreStreamInterceptors = append(options.PreStreamInterceptors, interceptor)
+	}
+}
+
 // WithPostUnaryInterceptor option can be used to add your own `grpc.UnaryServerInterceptor`
 // after all others defined automatically by the package.
 func WithPostUnaryInterceptor(interceptor grpc.UnaryServerInterceptor) Option {
@@ -270,8 +288,9 @@ func WithConnectStrictContentType(allowJSON bool) Option {
 // [grpc.KeepaliveEnforcementPolicy], [grpc.KeepaliveParams] and more.
 //
 // It's important to note that if you pass [grpc_middleware.WithStreamServerChain] or
-// [grpc_middleware.WithUnaryServerChain], you are going to override [WithPostUnaryInterceptor]
-// and [WithPostUnaryInterceptor] since those are configured via [grpc.NewServer].
+// [grpc_middleware.WithUnaryServerChain], you are going to override [WithPreUnaryInterceptor],
+// [WithPreStreamInterceptor], [WithPostUnaryInterceptor] and [WithPostStreamInterceptor] 
+// since those are configured via [grpc.NewServer].
 func WithGRPCServerOptions(opts ...grpc.ServerOption) Option {
 	return func(options *Options) {
 		options.ServerOptions = opts

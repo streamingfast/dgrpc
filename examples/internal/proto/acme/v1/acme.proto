@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package acme.v1;
-option go_package = "github.com/streamingfast/dgrpc/examples/pb/acme/v1;pbacme";
+option go_package = "github.com/streamingfast/dgrpc/examples/internal/pb/acme/v1;pbacme";
 
 service PingPongService {
   rpc GetPing(GetPingRequest) returns (PingResponse);

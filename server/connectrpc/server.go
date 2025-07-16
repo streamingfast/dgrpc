@@ -74,6 +74,9 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 	}
 	var interceptors []connect.Interceptor
 
+	// Add default panic isolation interceptor first
+	interceptors = append(interceptors, IsolateRequestPanicInterceptor(srv.logger))
+
 	if options.ConnectWebStrictContentType {
 		interceptors = append(interceptors, ContentTypeInterceptor{allowJSON: options.ConnectWebAllowJSON})
 	}

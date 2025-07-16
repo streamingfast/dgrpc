@@ -58,18 +58,31 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 	// The interceptor tries to extract the `trace_id` from the logger and configure the logger to always use it.
 	unaryLog, streamLog := tracelog.SetupLoggingInterceptors(options.Logger)
 
-	unaryInterceptors := []grpc.UnaryServerInterceptor{
+	unaryInterceptors := []grpc.UnaryServerInterceptor{}
+	streamInterceptors := []grpc.StreamServerInterceptor{}
+
+	// Adds custom defined pre-interceptors first, they run before all others
+	if len(options.PreUnaryInterceptors) > 0 {
+		unaryInterceptors = append(unaryInterceptors, options.PreUnaryInterceptors...)
+	}
+
+	if len(options.PreStreamInterceptors) > 0 {
+		streamInterceptors = append(streamInterceptors, options.PreStreamInterceptors...)
+	}
+
+	// Add standard dgrpc interceptors
+	unaryInterceptors = append(unaryInterceptors,
 		grpc_prometheus.UnaryServerInterceptor,
 		otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		unaryLog,
-	}
-	streamInterceptors := []grpc.StreamServerInterceptor{
+	)
+	streamInterceptors = append(streamInterceptors,
 		grpc_prometheus.StreamServerInterceptor,
 		otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		streamLog,
-	}
+	)
 
-	// Adds custom defined interceptors, they come after all others
+	// Adds custom defined post-interceptors, they come after all others
 	if len(options.PostUnaryInterceptors) > 0 {
 		unaryInterceptors = append(unaryInterceptors, options.PostUnaryInterceptors...)
 	}

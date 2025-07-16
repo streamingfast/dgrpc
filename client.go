@@ -120,13 +120,13 @@ func NewClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.Clien
 		opts = append(opts, extraOpts...)
 	}
 
-	return grpc.Dial(remoteAddr, opts...)
+	return grpc.NewClient(remoteAddr, opts...)
 }
 
 // WithAutoTransportCredentials returns a [grpc.DialOption] that automatically selects the right transport credentials.
 // It has the same behavior as [WithMustAutoTransportCredentials] but returns an error instead of panicking.
 //
-// Refer to [WithMustAutoTransportCredentials] for detailled information about the various combinations.
+// Refer to [WithMustAutoTransportCredentials] for detailed information about the various combinations.
 func WithAutoTransportCredentials(insecureTLS bool, plainText bool, xds bool) (grpc.DialOption, error) {
 	if moreThanOneTrue(insecureTLS, plainText, xds) {
 		return nil, fmt.Errorf("only one of insecureTLS, plainText or xds can be set to true, those are mutually exlusive")

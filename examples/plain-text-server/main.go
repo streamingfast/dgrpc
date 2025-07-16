@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/streamingfast/dgrpc/examples/internal/impl"
+	pbacme "github.com/streamingfast/dgrpc/examples/internal/pb/acme/v1"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/factory"
 	"github.com/streamingfast/logging"
@@ -20,8 +22,7 @@ func main() {
 		server.WithLogger(zlog),
 		server.WithHealthCheck(server.HealthCheckOverHTTP|server.HealthCheckOverGRPC, healthCheck),
 		server.WithRegisterService(func(gs *grpc.Server) {
-			// Register some more gRPC services here against `gs`
-			// pbstatedb.RegisterStateService(gs, implementation)
+			pbacme.RegisterPingPongServiceServer(gs, impl.NewPingPongGRPCServer("grpc-server-1", zlog))
 		}),
 	)
 

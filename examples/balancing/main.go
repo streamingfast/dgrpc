@@ -10,8 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dgrpc"
+
 	// You would import your own service package here
+	"github.com/streamingfast/dgrpc/examples/internal/impl"
 	pbacme "github.com/streamingfast/dgrpc/examples/internal/pb/acme/v1"
 	"github.com/streamingfast/dgrpc/server"
 	discovery_service "github.com/streamingfast/dgrpc/server/discovery-service"
@@ -40,14 +43,14 @@ containers for larger scale testing.
 
 func main() {
 	args := os.Args[1:]
-	ensureUsage(len(args) == 3 || len(args) == 4, "Invalid number of arguments provided")
+	EnsureUsage(len(args) == 3 || len(args) == 4, "Invalid number of arguments provided")
 
 	command := args[0]
 	nodeID := args[1]
 	addr := args[2]
 
-	ensureUsage(command == "client" || command == "server", "Invalid command provided, must be either 'client' or 'server'")
-	ensureUsage(nodeID != "", "Argument <id> must be provided")
+	EnsureUsage(command == "client" || command == "server", "Invalid command provided, must be either 'client' or 'server'")
+	EnsureUsage(nodeID != "", "Argument <id> must be provided")
 
 	if len(args) == 4 && args[3] != "" {
 		configureDiscoveryService(args[3])
@@ -62,9 +65,8 @@ func main() {
 
 func configureDiscoveryService(discoverServiceURL string) {
 	dsURL, err := url.Parse(discoverServiceURL)
-	ensureNoError(err, "Invalid discovery service URL provided")
-
-	ensureNoError(discovery_service.Bootstrap(dsURL), "Unable to bootstrap discovery service")
+	cli.NoError(err, "Invalid discovery service URL provided")
+	cli.NoError(discovery_service.Bootstrap(dsURL), "Unable to bootstrap discovery service")
 
 	if os.Getenv("GRPC_XDS_BOOTSTRAP") == "" {
 		fmt.Println("You defined a discovery service URL but did not set the GRPC_XDS_BOOTSTRAP environment variable.")
@@ -87,7 +89,7 @@ func runClient(nodeID string, remoteAddr string) {
 	var conns []*grpc.ClientConn
 	for i := 0; i < 1; i++ {
 		conn, err := dgrpc.NewInternalClientConn(remoteAddr)
-		ensureNoError(err, "Unable to create client conn at %q", remoteAddr)
+		cli.NoError(err, "Unable to create client conn at %q", remoteAddr)
 
 		conns = append(conns, conn)
 	}
@@ -127,7 +129,7 @@ func runClient(nodeID string, remoteAddr string) {
 				}
 
 				resp, err := client.GetPing(context.Background(), &pbacme.GetPingRequest{ClientId: clientID, ResponseDelayInMillis: uint64(responseDelayInMillis)})
-				ensureNoError(err, "Unable to complete ping request")
+				cli.NoError(err, "Unable to complete ping request")
 
 				logger.Info("received GetPing response", zap.String("server_id", resp.ServerId))
 			}
@@ -157,7 +159,7 @@ func runServer(nodeID string, listenAddr string) {
 		server.WithHealthCheck(server.HealthCheckOverGRPC, healthCheck),
 		server.WithRegisterService(func(gs *grpc.Server) {
 			// Here you would register your own services and implementations
-			pbacme.RegisterPingPongServiceServer(gs, pbacme.NewPingPongServiceServerImpl(nodeID, zlogServer.With(zap.String("node_id", nodeID))))
+			pbacme.RegisterPingPongServiceServer(gs, impl.NewPingPongGRPCServer(nodeID, zlogServer.With(zap.String("node_id", nodeID))))
 		}),
 	)
 
@@ -192,18 +194,13 @@ func healthCheck(ctx context.Context) (isReady bool, out interface{}, err error)
 	return true, nil, nil
 }
 
-func ensureNoError(err error, msg string, args ...interface{}) {
-	if err != nil {
-		fmt.Println("ERROR: " + fmt.Sprintf(msg, args...))
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-}
-
-func ensureUsage(condition bool, msg string, args ...interface{}) {
+func EnsureUsage(condition bool, message string, args ...interface{}) {
 	if !condition {
-		fmt.Println("ERROR: " + fmt.Sprintf(msg, args...) + "\n\n" + usage)
-		os.Exit(1)
+		fmt.Println("❌ Usage Error")
+		fmt.Println(fmt.Sprintf(" • "+message+"\n", args...))
+		fmt.Println(usage)
+
+		cli.Exit(1)
 	}
 }
 
