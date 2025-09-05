@@ -73,12 +73,10 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 	// Add standard dgrpc interceptors
 	unaryInterceptors = append(unaryInterceptors,
 		grpc_prometheus.UnaryServerInterceptor,
-		otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		unaryLog,
 	)
 	streamInterceptors = append(streamInterceptors,
 		grpc_prometheus.StreamServerInterceptor,
-		otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		streamLog,
 	)
 
@@ -103,6 +101,7 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 				Time:    30 * time.Second, // Ping the client if it is idle for this amount of time
 				Timeout: 10 * time.Second, // Wait this amount of time after the ping before assuming connection is dead
 			}),
+		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
 		grpc_middleware.WithUnaryServerChain(unaryInterceptors...),
 		grpc_middleware.WithStreamServerChain(streamInterceptors...),
 	}
