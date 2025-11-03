@@ -7,9 +7,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// IsGRPCErrorCode is a convenience to reduce code when using [AsGRPCError]:
+// IsGRPCErrorCode is a convenience to reduce code when using [AsGRPCError]
+// like so:
 //
-//	if err := AsGRPCError(err); err != nil && err.Code() == code {
+//	if err := dgrpc.AsGRPCError(err); err != nil && err.Code() == code {
 //		return true
 //	}
 //
@@ -22,12 +23,12 @@ func IsGRPCErrorCode(err error, code codes.Code) bool {
 	return false
 }
 
-// AsGRPCError recursively finds the first value [Status] representation out of
+// AsGRPCError recursively finds the first value [status.Status] representation out of
 // this error stack. Refers to [status.FromError] for details how this is tested.
 //
-// If no such [Status] can be found, nil is returned, expected usage is:
+// If no such [status.Status] can be found, nil is returned, expected usage is:
 //
-//	if err := AsGRPCError(err); err != nil && err.Code == codes.Canceled {
+//	if err := dgrpc.AsGRPCError(err); err != nil && err.Code() == codes.Canceled {
 //		// Do something
 //	}
 func AsGRPCError(err error) *status.Status {
