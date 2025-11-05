@@ -368,14 +368,12 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 	streamInterceptors = append(streamInterceptors,
 		grpc_ctxtags.StreamServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 		grpc_prometheus.StreamServerInterceptor,
-		otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		zapStreamInterceptor, // zap base server interceptor
 	)
 
 	unaryInterceptors = append(unaryInterceptors,
 		grpc_ctxtags.UnaryServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 		grpc_prometheus.UnaryServerInterceptor,
-		otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		zapUnaryInterceptor, // zap base server interceptor
 	)
 
@@ -409,6 +407,7 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 					Timeout: 10 * time.Second, // Wait this amount of time after the ping before assuming connection is dead
 				},
 			),
+			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
 			grpc_middleware.WithStreamServerChain(streamInterceptors...),
 			grpc_middleware.WithUnaryServerChain(unaryInterceptors...),
 		}, options.ServerOptions...)...,

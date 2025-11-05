@@ -93,11 +93,11 @@ func NewExternalClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*gr
 //
 // It accepts extra gRPC DialOptions to be passed to the grpc.Dial function.
 func NewClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
+
 	opts := []grpc.DialOption{
 		roundrobinDialOption,
 		keepaliveDialOption,
-		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithDefaultCallOptions(
 			largeRecvMsgSizeCallOption,
 		),
