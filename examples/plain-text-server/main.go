@@ -36,6 +36,10 @@ func main() {
 		os.Exit(1)
 	})
 
+	zlog.Info("starting gRPC (plain-text) server on localhost:9000")
+	zlog.Info(`gRPC curl example: grpcurl -d '{"clientId":"test","message":"hello"}' -plaintext localhost:9000 acme.v1.PingPongService/GetPing`)
+	zlog.Info("health check: curl http://localhost:9000/healthz")
+
 	go server.Launch("localhost:9000")
 
 	// We wait 5m before shutting down, in reality you would tie that so lifecycle of your app

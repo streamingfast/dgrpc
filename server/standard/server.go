@@ -16,13 +16,11 @@ package standard
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -30,7 +28,6 @@ import (
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/streamingfast/dgrpc/insecure"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/tracelog"
 	"github.com/streamingfast/shutter"
@@ -54,7 +51,7 @@ var notReadyResponse = map[string]interface{}{"is_ready": false}
 // logging chattiness of various aspect of the dgrpc middleware.
 //
 // Accepted value is a scale from 0 to 5 (inclusively). A verbosity of 0
-// means really not verbose, while 5 means really realy verbose. It can
+// means really not verbose, while 5 means really really verbose. It can
 // be mostly seen as: `Fatal` (0), `Error` (1), `Warn` (2), `Info` (3),
 // `Debug` (4) and `Trace` (5).
 //
@@ -430,41 +427,96 @@ func defaultLoggingDecider(fullMethodName string, err error) bool {
 }
 
 func defaultServerCodeLevel(code codes.Code) zapcore.Level {
+	// Our default is Verbosity 3 (which essentially means Info) and higher means more verbose
+	// while lower means less verbose.
 	if Verbosity <= 2 {
-		if code == codes.OK {
-			return zap.DebugLevel
-		}
-
-		if code == codes.Unauthenticated {
-			return zap.DebugLevel
-		}
-
-		if code == codes.Unavailable {
-			return zap.DebugLevel
-		}
-
-		if code == codes.Unknown {
-			return zap.DebugLevel
-		}
-
-		if code == codes.NotFound {
-			return zap.DebugLevel
-		}
+		return defaultServerCodeLessVerbosity(code)
 	}
 
-	return grpc_zap.DefaultCodeToLevel(code)
+	return defaultServerCodeNormalVerbosity(code)
 }
 
-func snakeoilTLS() *tls.Config {
-	return &tls.Config{
-		Certificates: []tls.Certificate{insecure.Cert},
-		ClientCAs:    insecure.CertPool,
-		ClientAuth:   tls.VerifyClientCertIfGiven,
+// defaultServerCodeNormalVerbosity maps gRPC codes to zap logging levels. Our rule of thumb
+// is that it's something expected to happen, log in Debug, unusual but not alarming is Info, something
+// that should be looked at is Warn and something really bad is Error.
+func defaultServerCodeNormalVerbosity(code codes.Code) zapcore.Level {
+	switch code {
+	case codes.OK:
+		return zap.DebugLevel
+	case codes.Canceled:
+		return zap.DebugLevel
+	case codes.Unknown:
+		return zap.ErrorLevel
+	case codes.InvalidArgument:
+		return zap.DebugLevel
+	case codes.DeadlineExceeded:
+		return zap.InfoLevel
+	case codes.NotFound:
+		return zap.DebugLevel
+	case codes.AlreadyExists:
+		return zap.DebugLevel
+	case codes.PermissionDenied:
+		return zap.DebugLevel
+	case codes.Unauthenticated:
+		return zap.DebugLevel // unauthenticated requests can happen
+	case codes.ResourceExhausted:
+		return zap.WarnLevel
+	case codes.FailedPrecondition:
+		return zap.DebugLevel
+	case codes.Aborted:
+		return zap.DebugLevel
+	case codes.OutOfRange:
+		return zap.InfoLevel
+	case codes.Unimplemented:
+		return zap.ErrorLevel
+	case codes.Internal:
+		return zap.ErrorLevel
+	case codes.Unavailable:
+		return zap.InfoLevel
+	case codes.DataLoss:
+		return zap.ErrorLevel
+	default:
+		return zap.ErrorLevel
 	}
 }
 
-func insecureAddr(in string) (out string, insecure bool) {
-	insecure = strings.Contains(in, "*")
-	out = strings.Replace(in, "*", "", -1)
-	return
+func defaultServerCodeLessVerbosity(code codes.Code) zapcore.Level {
+	switch code {
+	case codes.OK:
+		return zap.DebugLevel
+	case codes.Canceled:
+		return zap.DebugLevel
+	case codes.Unknown:
+		return zap.DebugLevel
+	case codes.InvalidArgument:
+		return zap.DebugLevel
+	case codes.DeadlineExceeded:
+		return zap.InfoLevel
+	case codes.NotFound:
+		return zap.DebugLevel
+	case codes.AlreadyExists:
+		return zap.DebugLevel
+	case codes.PermissionDenied:
+		return zap.InfoLevel
+	case codes.Unauthenticated:
+		return zap.DebugLevel // unauthenticated requests can happen
+	case codes.ResourceExhausted:
+		return zap.InfoLevel
+	case codes.FailedPrecondition:
+		return zap.InfoLevel
+	case codes.Aborted:
+		return zap.InfoLevel
+	case codes.OutOfRange:
+		return zap.InfoLevel
+	case codes.Unimplemented:
+		return zap.ErrorLevel
+	case codes.Internal:
+		return zap.ErrorLevel
+	case codes.Unavailable:
+		return zap.InfoLevel
+	case codes.DataLoss:
+		return zap.ErrorLevel
+	default:
+		return zap.ErrorLevel
+	}
 }
