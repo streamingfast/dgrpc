@@ -454,17 +454,17 @@ func defaultServerCodeNormalVerbosity(code codes.Code) zapcore.Level {
 	case codes.NotFound:
 		return zap.DebugLevel
 	case codes.AlreadyExists:
-		return zap.DebugLevel
+		return zap.InfoLevel
 	case codes.PermissionDenied:
 		return zap.DebugLevel
 	case codes.Unauthenticated:
 		return zap.DebugLevel // unauthenticated requests can happen
 	case codes.ResourceExhausted:
-		return zap.WarnLevel
+		return zap.InfoLevel
 	case codes.FailedPrecondition:
-		return zap.DebugLevel
+		return zap.InfoLevel
 	case codes.Aborted:
-		return zap.DebugLevel
+		return zap.InfoLevel
 	case codes.OutOfRange:
 		return zap.InfoLevel
 	case codes.Unimplemented:
