@@ -73,12 +73,10 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 	// Add standard dgrpc interceptors
 	unaryInterceptors = append(unaryInterceptors,
 		grpc_prometheus.UnaryServerInterceptor,
-		otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		unaryLog,
 	)
 	streamInterceptors = append(streamInterceptors,
 		grpc_prometheus.StreamServerInterceptor,
-		otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider)),
 		streamLog,
 	)
 
@@ -92,6 +90,7 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 	}
 
 	opts := []grpc.ServerOption{
+		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
 		grpc.Creds(creds),
 		grpc.KeepaliveEnforcementPolicy(
 			keepalive.EnforcementPolicy{

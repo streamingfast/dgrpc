@@ -96,8 +96,7 @@ func NewClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.Clien
 	opts := []grpc.DialOption{
 		roundrobinDialOption,
 		keepaliveDialOption,
-		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithDefaultCallOptions(
 			largeRecvMsgSizeCallOption,
 		),
