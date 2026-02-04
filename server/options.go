@@ -82,6 +82,12 @@ func WithCORS(c *cors.Cors) Option {
 	return WithConnectCORS(c)
 }
 
+func WithEnforceCompression(c *cors.Cors) Option {
+	return func(options *Options) {
+		options.EnforceCompression = true
+	}
+}
+
 // WithConnectCORS Will apply the CORS policy to your server.
 //
 // **Important** Only taken into consideration by'dgrpc/server/connectrpc#Server' server, ignored by all other
