@@ -29,8 +29,6 @@ import (
 	"connectrpc.com/otelconnect"
 	gmux "github.com/gorilla/mux"
 	"github.com/klauspost/compress/gzhttp"
-
-	//"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/tracelog"
@@ -90,8 +88,8 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 	interceptors = append(interceptors, options.ConnectExtraInterceptors...)
 
 	var connectOpts []connect.HandlerOption
-	//connectOpts = append(connectOpts, connect.WithInterceptors(interceptors...))
-	//connectOpts = append(connectOpts, connect.WithCompression("zstd", getZstdDecompressor, getZstdCompressor))
+	connectOpts = append(connectOpts, connect.WithInterceptors(interceptors...))
+	connectOpts = append(connectOpts, connect.WithCompression("zstd", getZstdDecompressor, getZstdCompressor))
 
 	mux := gmux.NewRouter()
 
