@@ -121,7 +121,7 @@ func (s *StandardServer) GrpcServer() *grpc.Server {
 //
 // This should be called in a Goroutine `go server.Launch("localhost:9000")` and
 // `server.Shutdown()` should be called later on to stop gracefully the server.
-func (s *StandardServer) Launch(serverListenerAddress string) {
+func (s *StandardServer) Launch(enforceCompression bool, serverListenerAddress string) {
 	s.logger().Info("launching gRPC server", zap.String("listen_addr", serverListenerAddress))
 	tcpListener, err := net.Listen("tcp", serverListenerAddress)
 	if err != nil {
@@ -136,7 +136,7 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 
 		grpcRouter.Path("/").Handler(healthHandler)
 		grpcRouter.Path("/healthz").Handler(healthHandler)
-		grpcRouter.PathPrefix("/").Handler(compressionHandler(s.grpcServer))
+		grpcRouter.PathPrefix("/").Handler(compressionHandler(enforceCompression, s.grpcServer))
 
 		errorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
 		if err != nil {

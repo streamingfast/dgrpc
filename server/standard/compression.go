@@ -7,9 +7,9 @@ import (
 	"google.golang.org/grpc/encoding"
 )
 
-func compressionHandler(h http.Handler) http.Handler {
+func compressionHandler(enforceCompression bool, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		compressor := ""
+		compressor := "identity"
 
 		vv := r.Header.Values("grpc-encoding")
 		if len(vv) > 0 {
@@ -37,8 +37,10 @@ func compressionHandler(h http.Handler) http.Handler {
 		} else if c := firstSupportedCompressor(r.Header.Values("accept-encoding")); c != "" {
 			compressor = c
 		} else {
-			writeBadRequest(w, "no supported compression found.")
-			return
+			if enforceCompression {
+				writeBadRequest(w, "no supported compression found.")
+				return
+			}
 		}
 
 		r.Header.Add("grpc-encoding", compressor)
