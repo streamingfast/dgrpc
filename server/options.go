@@ -82,7 +82,7 @@ func WithCORS(c *cors.Cors) Option {
 	return WithConnectCORS(c)
 }
 
-func WithEnforceCompression(c *cors.Cors) Option {
+func WithEnforceCompression() Option {
 	return func(options *Options) {
 		options.EnforceCompression = true
 	}
