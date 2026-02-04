@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func ServerFromOptions(enforceCompression bool, opts ...server.Option) server.Server {
+func ServerFromOptions(opts ...server.Option) server.Server {
 	options := server.NewOptions()
 	for _, opt := range opts {
 		opt(options)
@@ -35,5 +35,5 @@ func ServerFromOptions(enforceCompression bool, opts ...server.Option) server.Se
 	}
 
 	logger.Info("standard server created")
-	return standard.NewServer(enforceCompression, options)
+	return standard.NewServer(options)
 }
