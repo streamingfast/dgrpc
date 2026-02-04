@@ -136,7 +136,7 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 
 		grpcRouter.Path("/").Handler(healthHandler)
 		grpcRouter.Path("/healthz").Handler(healthHandler)
-		grpcRouter.PathPrefix("/").Handler(s.grpcServer)
+		grpcRouter.PathPrefix("/").Handler(compressionHandler(s.grpcServer))
 
 		errorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
 		if err != nil {
