@@ -72,10 +72,11 @@ var Verbosity = 3
 // - WithSecure(SecuredByX509KeyPair(..., ...)) => Starts a TLS HTTP2 endpoint to serve the gRPC over an encrypted connection
 // - WithHealthCheck(check, HealthCheckOverHTTP) => Offers an HTTP endpoint `/healthz` to query the health check over HTTP
 type StandardServer struct {
-	shutter    *shutter.Shutter
-	options    *server.Options
-	grpcServer *grpc.Server
-	httpServer *http.Server
+	shutter            *shutter.Shutter
+	options            *server.Options
+	grpcServer         *grpc.Server
+	httpServer         *http.Server
+	enforceCompression bool
 }
 
 // NewServer
@@ -94,11 +95,12 @@ type StandardServer struct {
 //
 //	we are satisfied with the interface and feature set, the actual
 //	`NewServer` will be replaced by this implementation.
-func NewServer(options *server.Options) *StandardServer {
+func NewServer(enforceCompression bool, options *server.Options) *StandardServer {
 	srv := &StandardServer{
-		shutter:    shutter.New(),
-		options:    options,
-		grpcServer: newGRPCServer(options),
+		shutter:            shutter.New(),
+		options:            options,
+		grpcServer:         newGRPCServer(options),
+		enforceCompression: enforceCompression,
 	}
 
 	if options.HealthCheck != nil && server.HealthCheckOverGRPC.IsActive(uint8(options.HealthCheckOver)) {
@@ -121,7 +123,7 @@ func (s *StandardServer) GrpcServer() *grpc.Server {
 //
 // This should be called in a Goroutine `go server.Launch("localhost:9000")` and
 // `server.Shutdown()` should be called later on to stop gracefully the server.
-func (s *StandardServer) Launch(enforceCompression bool, serverListenerAddress string) {
+func (s *StandardServer) Launch(serverListenerAddress string) {
 	s.logger().Info("launching gRPC server", zap.String("listen_addr", serverListenerAddress))
 	tcpListener, err := net.Listen("tcp", serverListenerAddress)
 	if err != nil {
@@ -136,7 +138,7 @@ func (s *StandardServer) Launch(enforceCompression bool, serverListenerAddress s
 
 		grpcRouter.Path("/").Handler(healthHandler)
 		grpcRouter.Path("/healthz").Handler(healthHandler)
-		grpcRouter.PathPrefix("/").Handler(compressionHandler(enforceCompression, s.grpcServer))
+		grpcRouter.PathPrefix("/").Handler(compressionHandler(s.enforceCompression, s.grpcServer))
 
 		errorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
 		if err != nil {
