@@ -72,11 +72,10 @@ var Verbosity = 3
 // - WithSecure(SecuredByX509KeyPair(..., ...)) => Starts a TLS HTTP2 endpoint to serve the gRPC over an encrypted connection
 // - WithHealthCheck(check, HealthCheckOverHTTP) => Offers an HTTP endpoint `/healthz` to query the health check over HTTP
 type StandardServer struct {
-	shutter            *shutter.Shutter
-	options            *server.Options
-	grpcServer         *grpc.Server
-	httpServer         *http.Server
-	enforceCompression bool
+	shutter    *shutter.Shutter
+	options    *server.Options
+	grpcServer *grpc.Server
+	httpServer *http.Server
 }
 
 // NewServer
@@ -95,12 +94,11 @@ type StandardServer struct {
 //
 //	we are satisfied with the interface and feature set, the actual
 //	`NewServer` will be replaced by this implementation.
-func NewServer(enforceCompression bool, options *server.Options) *StandardServer {
+func NewServer(options *server.Options) *StandardServer {
 	srv := &StandardServer{
-		shutter:            shutter.New(),
-		options:            options,
-		grpcServer:         newGRPCServer(options),
-		enforceCompression: enforceCompression,
+		shutter:    shutter.New(),
+		options:    options,
+		grpcServer: newGRPCServer(options),
 	}
 
 	if options.HealthCheck != nil && server.HealthCheckOverGRPC.IsActive(uint8(options.HealthCheckOver)) {
@@ -138,7 +136,7 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 
 		grpcRouter.Path("/").Handler(healthHandler)
 		grpcRouter.Path("/healthz").Handler(healthHandler)
-		grpcRouter.PathPrefix("/").Handler(compressionHandler(s.enforceCompression, s.grpcServer))
+		grpcRouter.PathPrefix("/").Handler(compressionHandler(s.options.EnforceCompression, s.grpcServer))
 
 		errorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
 		if err != nil {

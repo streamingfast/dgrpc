@@ -13,11 +13,12 @@ import (
 )
 
 type Options struct {
-	HealthCheck     HealthCheck
-	HealthCheckOver HealthCheckOver
-	Logger          *zap.Logger
-	IsPlainText     bool
-	OverrideTraceID bool
+	HealthCheck        HealthCheck
+	HealthCheckOver    HealthCheckOver
+	Logger             *zap.Logger
+	IsPlainText        bool
+	OverrideTraceID    bool
+	EnforceCompression bool
 
 	// GRPC-only options
 	ServerOptions            []grpc.ServerOption
@@ -289,7 +290,7 @@ func WithConnectStrictContentType(allowJSON bool) Option {
 //
 // It's important to note that if you pass [grpc_middleware.WithStreamServerChain] or
 // [grpc_middleware.WithUnaryServerChain], you are going to override [WithPreUnaryInterceptor],
-// [WithPreStreamInterceptor], [WithPostUnaryInterceptor] and [WithPostStreamInterceptor] 
+// [WithPreStreamInterceptor], [WithPostUnaryInterceptor] and [WithPostStreamInterceptor]
 // since those are configured via [grpc.NewServer].
 func WithGRPCServerOptions(opts ...grpc.ServerOption) Option {
 	return func(options *Options) {
