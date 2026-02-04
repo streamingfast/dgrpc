@@ -28,6 +28,8 @@ import (
 	"connectrpc.com/grpcreflect"
 	"connectrpc.com/otelconnect"
 	gmux "github.com/gorilla/mux"
+	"github.com/klauspost/compress/gzhttp"
+
 	//"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 	"github.com/streamingfast/dgrpc/server"
@@ -136,17 +138,9 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		handler = options.ConnectWebCORS.Handler(mux)
 	}
 
-	fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-	fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-	fmt.Println("Returning server with handler")
-	fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-	fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-	srv.handler = h2c.NewHandler(handler, &http2.Server{
+	srv.handler = h2c.NewHandler(gzhttp.GzipHandler(handler), &http2.Server{
 		MaxConcurrentStreams: 1000,
 	})
-	//srv.handler = h2c.NewHandler(gzhttp.GzipHandler(handler), &http2.Server{
-	//	MaxConcurrentStreams: 1000,
-	//})
 
 	return srv
 }
