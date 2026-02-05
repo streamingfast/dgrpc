@@ -125,12 +125,12 @@ func TestFirstSupportedCompressor(t *testing.T) {
 	}{
 		{
 			name:        "first is supported",
-			compressors: []string{"gzip", "identity"},
+			compressors: []string{"gzip,br", "identity"},
 			expected:    "gzip",
 		},
 		{
 			name:        "second is supported",
-			compressors: []string{"unsupported", "gzip"},
+			compressors: []string{"unsupported", "gzip,br"},
 			expected:    "gzip",
 		},
 		{

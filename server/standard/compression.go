@@ -3,6 +3,7 @@ package standard
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc/encoding"
@@ -53,9 +54,11 @@ func compressionHandler(enforceCompression bool, h http.Handler) http.Handler {
 }
 
 func firstSupportedCompressor(compressors []string) string {
-	for _, c := range compressors {
-		if encoding.GetCompressor(c) != nil {
-			return c
+	for _, cs := range compressors {
+		for _, c := range strings.Split(cs, ",") {
+			if encoding.GetCompressor(c) != nil {
+				return c
+			}
 		}
 	}
 	return ""
