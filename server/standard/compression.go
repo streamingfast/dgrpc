@@ -68,25 +68,3 @@ func writeBadRequest(w http.ResponseWriter, message string) {
 	w.WriteHeader(http.StatusBadRequest)
 	w.Write([]byte(message))
 }
-
-//var compressionHeader = map[string]map[string]bool{
-//	"grpc-accept-encoding":    {"gzip": true, "zstd": true},
-//	"connect-accept-encoding": {"gzip": true, "zstd": true},
-//	"accept-encoding":         {"gzip": true}, // HTTP encoding for connect+proto in browser
-//}
-
-//
-//func compressorsFromHeader(header http.Header) (out map[string]bool) {
-//	out = make(map[string]bool)
-//	for k, v := range header {
-//		petitK := strings.ToLower(k)
-//		if petitK == "grpc-accept-encoding" || petitK == "connect-accept-encoding" || petitK == "accept-encoding" {
-//			for _, vv := range v {
-//				for _, vvv := range strings.Split(vv, ",") {
-//					out[strings.ToLower(vvv)] = true
-//				}
-//			}
-//		}
-//	}
-//	return
-//}
