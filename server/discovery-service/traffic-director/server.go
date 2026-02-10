@@ -3,6 +3,7 @@ package traffic_director
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -28,8 +29,9 @@ import (
 type TrafficDirectorServer struct {
 	shutter *shutter.Shutter
 	//healthServer *grpc.Server
-	xdsServer *xds.GRPCServer
-	logger    *zap.Logger
+	xdsServer     *xds.GRPCServer
+	logger        *zap.Logger
+	grpcXDSServer *xds.GRPCServer
 }
 
 func NewServer(options *server.Options) *TrafficDirectorServer {
@@ -123,8 +125,20 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 		//healthServer: healthGrpcServer,
 		logger: options.Logger,
 	}
-
+	srv.grpcXDSServer = grpcXDSServer
 	return srv
+}
+
+func (s *TrafficDirectorServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	panic("not implemented")
+}
+
+func (s *TrafficDirectorServer) Error() error {
+	return s.shutter.Err()
+}
+
+func (s *TrafficDirectorServer) Terminating() <-chan struct{} {
+	return s.shutter.Terminating()
 }
 
 func (s *TrafficDirectorServer) ServiceRegistrar() grpc.ServiceRegistrar {

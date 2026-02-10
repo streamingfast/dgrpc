@@ -207,6 +207,14 @@ func (s *StandardServer) logger() *zap.Logger {
 	return s.options.Logger
 }
 
+func (s *StandardServer) Error() error {
+	return s.shutter.Err()
+}
+
+func (s *StandardServer) Terminating() <-chan struct{} {
+	return s.shutter.Terminating()
+}
+
 // RegisterService can be used to register your own gRPC service handler.
 //
 //	server := dgrpc.NewServer2(...)
@@ -301,6 +309,10 @@ func (s *StandardServer) healthHandler() http.Handler {
 			}
 		}
 	})
+}
+
+func (s *StandardServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	s.grpcServer.ServeHTTP(rw, req)
 }
 
 func (s *StandardServer) shutdownViaHTTP(timeout time.Duration) {
