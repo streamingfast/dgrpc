@@ -94,7 +94,7 @@ func TestCompressionHandler(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			})
 
-			h := compressionHandler(true, handler)
+			h := CompressionHandler(true, handler)
 
 			req := httptest.NewRequest("POST", "/", nil)
 			for k, vv := range tt.headers {

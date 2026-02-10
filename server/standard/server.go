@@ -136,7 +136,6 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 
 		grpcRouter.Path("/").Handler(healthHandler)
 		grpcRouter.Path("/healthz").Handler(healthHandler)
-		grpcRouter.PathPrefix("/").Handler(compressionHandler(s.options.EnforceCompression, s.grpcServer))
 
 		errorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
 		if err != nil {
@@ -148,8 +147,9 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 			MaxConcurrentStreams: 1000,
 		}
 
+		compressionHandler := CompressionHandler(s.options.EnforceCompression, grpcRouter)
 		s.httpServer = &http.Server{
-			Handler:  h2c.NewHandler(grpcRouter, h2s),
+			Handler:  h2c.NewHandler(compressionHandler, h2s),
 			ErrorLog: errorLogger,
 		}
 
