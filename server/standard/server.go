@@ -131,7 +131,7 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 
 	// We start an HTTP server only when having an health check that requires HTTP transport
 	if s.options.HealthCheck != nil && server.HealthCheckOverHTTP.IsActive(uint8(s.options.HealthCheckOver)) {
-		healthHandler := s.healthHandler()
+		healthHandler := s.HealthHandler()
 		grpcRouter := mux.NewRouter()
 
 		grpcRouter.Path("/").Handler(healthHandler)
@@ -272,7 +272,7 @@ func (s *StandardServer) shutdownViaGRPC(timeout time.Duration) {
 	}
 }
 
-func (s *StandardServer) healthHandler() http.Handler {
+func (s *StandardServer) HealthHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		isReady, out, err := s.healthCheck(r.Context())
 

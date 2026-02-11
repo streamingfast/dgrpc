@@ -26,6 +26,8 @@ type Server interface {
 	// Shutdown() or an error occurs (e.g. the server fails to start).
 	Launch(serverListenerAddress string)
 
+	HealthHandler() http.Handler
+
 	OnTerminated(f func(err error))
 	Terminating() <-chan struct{}
 

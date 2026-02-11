@@ -220,6 +220,9 @@ func (s *ConnectWebServer) checkHealth(ctx context.Context) (isReady bool, out i
 	return s.options.HealthCheck(ctx)
 }
 
+func (s *ConnectWebServer) HealthHandler() http.Handler {
+	return http.HandlerFunc(s.healthCheckHandler)
+}
 func (s *ConnectWebServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	isReady, out, err := s.checkHealth(r.Context())
 
