@@ -73,7 +73,7 @@ func WithServiceDiscoveryURL(u *url.URL) Option {
 func WithSecureServer(config SecureTLSConfig) Option {
 	return func(options *Options) {
 		options.IsPlainText = false
-		options.SecureTLSConfig = config.asTLSConfig()
+		options.SecureTLSConfig = config.AsTLSConfig()
 	}
 }
 
@@ -173,7 +173,7 @@ func WithConnectReflection(location string) Option {
 func WithInsecureServer() Option {
 	return func(options *Options) {
 		options.IsPlainText = false
-		options.SecureTLSConfig = SecuredByBuiltInSelfSignedCertificate().asTLSConfig()
+		options.SecureTLSConfig = SecuredByBuiltInSelfSignedCertificate().AsTLSConfig()
 	}
 }
 
