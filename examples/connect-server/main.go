@@ -58,7 +58,7 @@ func main() {
 	time.Sleep(5 * time.Minute)
 
 	// Gives 30s for a graceful shutdown
-	srv.Shutdown(nil)
+	srv.Shutdown(30 * time.Second)
 }
 
 func healthCheck(ctx context.Context) (isReady bool, out interface{}, err error) {
@@ -66,4 +66,3 @@ func healthCheck(ctx context.Context) (isReady bool, out interface{}, err error)
 	// If your application is ready to accept requests, return `true`, otherwise return `false`.
 	return true, nil, nil
 }
-

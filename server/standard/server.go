@@ -129,28 +129,29 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 		return
 	}
 
+	httpErrorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
+	if err != nil {
+		s.shutter.Shutdown(fmt.Errorf("unable to create logger: %w", err))
+		return
+	}
+
+	h2s := &http2.Server{
+		MaxConcurrentStreams: 1000,
+	}
+
 	// We start an HTTP server only when having an health check that requires HTTP transport
 	if s.options.HealthCheck != nil && server.HealthCheckOverHTTP.IsActive(uint8(s.options.HealthCheckOver)) {
 		healthHandler := s.HealthHandler()
-		grpcRouter := mux.NewRouter()
+		muxRoot := mux.NewRouter()
 
-		grpcRouter.Path("/").Handler(healthHandler)
-		grpcRouter.Path("/healthz").Handler(healthHandler)
+		muxRoot.Path("/").Handler(healthHandler)
+		muxRoot.Path("/healthz").Handler(healthHandler)
+		muxRoot.PathPrefix("/").Handler(s.grpcServer)
 
-		errorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
-		if err != nil {
-			s.shutter.Shutdown(fmt.Errorf("unable to create logger: %w", err))
-			return
-		}
-
-		h2s := &http2.Server{
-			MaxConcurrentStreams: 1000,
-		}
-
-		compressionHandler := CompressionHandler(s.options.EnforceCompression, grpcRouter)
+		compressionHandler := CompressionHandler(s.options.EnforceCompression, muxRoot)
 		s.httpServer = &http.Server{
 			Handler:  h2c.NewHandler(compressionHandler, h2s),
-			ErrorLog: errorLogger,
+			ErrorLog: httpErrorLogger,
 		}
 
 		if s.options.SecureTLSConfig != nil {
@@ -175,9 +176,15 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 		return
 	}
 
+	compressionHandler := CompressionHandler(s.options.EnforceCompression, s.grpcServer)
+	s.httpServer = &http.Server{
+		Handler:  h2c.NewHandler(compressionHandler, h2s),
+		ErrorLog: httpErrorLogger,
+	}
+
 	s.logger().Info("serving gRPC", zap.String("listen_addr", serverListenerAddress))
-	if err := s.grpcServer.Serve(tcpListener); err != nil {
-		s.shutter.Shutdown(fmt.Errorf("gRPC serve failed: %w", err))
+	if err := s.httpServer.Serve(tcpListener); err != nil {
+		s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
 		return
 	}
 }
