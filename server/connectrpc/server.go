@@ -37,7 +37,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
-	"google.golang.org/grpc"
 )
 
 var readyResponse = map[string]interface{}{"is_ready": true}
@@ -53,20 +52,6 @@ type ConnectWebServer struct {
 	options *server.Options
 
 	handler http.Handler
-}
-
-func (s *ConnectWebServer) Error() error {
-	return s.Shutter.Err()
-}
-
-func (s *ConnectWebServer) RegisterService(f func(gs grpc.ServiceRegistrar)) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *ConnectWebServer) ServiceRegistrar() grpc.ServiceRegistrar {
-	//TODO implement me
-	panic("implement me")
 }
 
 type HandlerGetter func(opts ...connect.HandlerOption) (string, http.Handler)
