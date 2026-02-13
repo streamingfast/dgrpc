@@ -1,15 +1,12 @@
 package server
 
 import (
-	"net/http"
 	"time"
 
 	"google.golang.org/grpc"
 )
 
 type Server interface {
-	ServeHTTP(rw http.ResponseWriter, req *http.Request)
-
 	// RegisterService registers one or more gRPC service to the server. The service must be
 	// registered **before** the `Launch()` method has been called otherwise this is a no-op.
 	//
@@ -26,10 +23,7 @@ type Server interface {
 	// Shutdown() or an error occurs (e.g. the server fails to start).
 	Launch(serverListenerAddress string)
 
-	HealthHandler() http.Handler
-
 	OnTerminated(f func(err error))
-	Terminating() <-chan struct{}
 
 	// Shutdown the server, this is a blocking call and will block the current goroutine
 	// until the server is fully shutdown. The shutdown is performed gracefully, meaning
@@ -43,6 +37,4 @@ type Server interface {
 	// delay has passed. By doing this, you are going to give the load balancer some
 	// time to stop sending traffic to this server before it is terminated.
 	Shutdown(timeout time.Duration)
-
-	Error() error
 }
