@@ -129,28 +129,29 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 		return
 	}
 
+	httpErrorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
+	if err != nil {
+		s.shutter.Shutdown(fmt.Errorf("unable to create logger: %w", err))
+		return
+	}
+
+	h2s := &http2.Server{
+		MaxConcurrentStreams: 1000,
+	}
+
 	// We start an HTTP server only when having an health check that requires HTTP transport
 	if s.options.HealthCheck != nil && server.HealthCheckOverHTTP.IsActive(uint8(s.options.HealthCheckOver)) {
-		healthHandler := s.healthHandler()
-		grpcRouter := mux.NewRouter()
+		healthHandler := s.HealthHandler()
+		muxRoot := mux.NewRouter()
 
-		grpcRouter.Path("/").Handler(healthHandler)
-		grpcRouter.Path("/healthz").Handler(healthHandler)
-		grpcRouter.PathPrefix("/").Handler(s.grpcServer)
+		muxRoot.Path("/").Handler(healthHandler)
+		muxRoot.Path("/healthz").Handler(healthHandler)
+		muxRoot.PathPrefix("/").Handler(s.grpcServer)
 
-		errorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
-		if err != nil {
-			s.shutter.Shutdown(fmt.Errorf("unable to create logger: %w", err))
-			return
-		}
-
-		h2s := &http2.Server{
-			MaxConcurrentStreams: 1000,
-		}
-
+		compressionHandler := CompressionHandler(s.options.EnforceCompression, muxRoot)
 		s.httpServer = &http.Server{
-			Handler:  h2c.NewHandler(grpcRouter, h2s),
-			ErrorLog: errorLogger,
+			Handler:  h2c.NewHandler(compressionHandler, h2s),
+			ErrorLog: httpErrorLogger,
 		}
 
 		if s.options.SecureTLSConfig != nil {
@@ -175,9 +176,15 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 		return
 	}
 
+	compressionHandler := CompressionHandler(s.options.EnforceCompression, s.grpcServer)
+	s.httpServer = &http.Server{
+		Handler:  h2c.NewHandler(compressionHandler, h2s),
+		ErrorLog: httpErrorLogger,
+	}
+
 	s.logger().Info("serving gRPC", zap.String("listen_addr", serverListenerAddress))
-	if err := s.grpcServer.Serve(tcpListener); err != nil {
-		s.shutter.Shutdown(fmt.Errorf("gRPC serve failed: %w", err))
+	if err := s.httpServer.Serve(tcpListener); err != nil {
+		s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
 		return
 	}
 }
@@ -205,6 +212,14 @@ type errorResponse struct {
 
 func (s *StandardServer) logger() *zap.Logger {
 	return s.options.Logger
+}
+
+func (s *StandardServer) Error() error {
+	return s.shutter.Err()
+}
+
+func (s *StandardServer) Terminating() <-chan struct{} {
+	return s.shutter.Terminating()
 }
 
 // RegisterService can be used to register your own gRPC service handler.
@@ -264,7 +279,7 @@ func (s *StandardServer) shutdownViaGRPC(timeout time.Duration) {
 	}
 }
 
-func (s *StandardServer) healthHandler() http.Handler {
+func (s *StandardServer) HealthHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		isReady, out, err := s.healthCheck(r.Context())
 
@@ -301,6 +316,10 @@ func (s *StandardServer) healthHandler() http.Handler {
 			}
 		}
 	})
+}
+
+func (s *StandardServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	s.grpcServer.ServeHTTP(rw, req)
 }
 
 func (s *StandardServer) shutdownViaHTTP(timeout time.Duration) {

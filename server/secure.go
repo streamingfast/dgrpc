@@ -8,12 +8,12 @@ import (
 )
 
 type SecureTLSConfig interface {
-	asTLSConfig() *tls.Config
+	AsTLSConfig() *tls.Config
 }
 
 type secureTLSConfigWrapper tls.Config
 
-func (c *secureTLSConfigWrapper) asTLSConfig() *tls.Config {
+func (c *secureTLSConfigWrapper) AsTLSConfig() *tls.Config {
 	return (*tls.Config)(c)
 }
 

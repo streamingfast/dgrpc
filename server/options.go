@@ -13,11 +13,12 @@ import (
 )
 
 type Options struct {
-	HealthCheck     HealthCheck
-	HealthCheckOver HealthCheckOver
-	Logger          *zap.Logger
-	IsPlainText     bool
-	OverrideTraceID bool
+	HealthCheck        HealthCheck
+	HealthCheckOver    HealthCheckOver
+	Logger             *zap.Logger
+	IsPlainText        bool
+	OverrideTraceID    bool
+	EnforceCompression bool
 
 	// GRPC-only options
 	ServerOptions            []grpc.ServerOption
@@ -72,13 +73,19 @@ func WithServiceDiscoveryURL(u *url.URL) Option {
 func WithSecureServer(config SecureTLSConfig) Option {
 	return func(options *Options) {
 		options.IsPlainText = false
-		options.SecureTLSConfig = config.asTLSConfig()
+		options.SecureTLSConfig = config.AsTLSConfig()
 	}
 }
 
 // Deprecated: Use WithConnectCORS instead
 func WithCORS(c *cors.Cors) Option {
 	return WithConnectCORS(c)
+}
+
+func WithEnforceCompression() Option {
+	return func(options *Options) {
+		options.EnforceCompression = true
+	}
 }
 
 // WithConnectCORS Will apply the CORS policy to your server.
@@ -166,7 +173,7 @@ func WithConnectReflection(location string) Option {
 func WithInsecureServer() Option {
 	return func(options *Options) {
 		options.IsPlainText = false
-		options.SecureTLSConfig = SecuredByBuiltInSelfSignedCertificate().asTLSConfig()
+		options.SecureTLSConfig = SecuredByBuiltInSelfSignedCertificate().AsTLSConfig()
 	}
 }
 
@@ -289,7 +296,7 @@ func WithConnectStrictContentType(allowJSON bool) Option {
 //
 // It's important to note that if you pass [grpc_middleware.WithStreamServerChain] or
 // [grpc_middleware.WithUnaryServerChain], you are going to override [WithPreUnaryInterceptor],
-// [WithPreStreamInterceptor], [WithPostUnaryInterceptor] and [WithPostStreamInterceptor] 
+// [WithPreStreamInterceptor], [WithPostUnaryInterceptor] and [WithPostStreamInterceptor]
 // since those are configured via [grpc.NewServer].
 func WithGRPCServerOptions(opts ...grpc.ServerOption) Option {
 	return func(options *Options) {

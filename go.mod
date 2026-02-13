@@ -10,6 +10,7 @@ require (
 	connectrpc.com/grpcreflect v1.3.0
 	connectrpc.com/otelconnect v0.8.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.54.0
+	github.com/dustin/go-humanize v1.0.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
@@ -18,7 +19,7 @@ require (
 	github.com/rs/cors v1.8.3
 	github.com/sercand/kuberesolver/v5 v5.1.1
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
-	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
+	github.com/streamingfast/logging v0.0.0-20260108192805-38f96de0a641
 	github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f
 	github.com/streamingfast/shutter v1.5.0
 	github.com/stretchr/testify v1.11.1

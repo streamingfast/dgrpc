@@ -28,8 +28,9 @@ import (
 type TrafficDirectorServer struct {
 	shutter *shutter.Shutter
 	//healthServer *grpc.Server
-	xdsServer *xds.GRPCServer
-	logger    *zap.Logger
+	xdsServer     *xds.GRPCServer
+	logger        *zap.Logger
+	grpcXDSServer *xds.GRPCServer
 }
 
 func NewServer(options *server.Options) *TrafficDirectorServer {
@@ -123,7 +124,7 @@ func NewServer(options *server.Options) *TrafficDirectorServer {
 		//healthServer: healthGrpcServer,
 		logger: options.Logger,
 	}
-
+	srv.grpcXDSServer = grpcXDSServer
 	return srv
 }
 

@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"connectrpc.com/grpchealth"
@@ -69,7 +70,7 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 
 	otlInterceptor, err := otelconnect.NewInterceptor()
 	if err != nil {
-		srv.Shutdown(fmt.Errorf("unable to create otel interceptor: %w", err))
+		srv.Shutter.Shutdown(fmt.Errorf("unable to create otel interceptor: %w", err))
 		return nil
 	}
 	var interceptors []connect.Interceptor
@@ -143,19 +144,31 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 	return srv
 }
 
+func (s *ConnectWebServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	s.handler.ServeHTTP(rw, req)
+}
+
+func (s *ConnectWebServer) Terminating() <-chan struct{} {
+	return s.Shutter.Terminating()
+}
+
+func (s *ConnectWebServer) Shutdown(d time.Duration) {
+	s.Shutter.Shutdown(nil)
+}
+
 // Launch should be run in a go func(), watch for termination by waiting on IsTerminating() channel
 func (s *ConnectWebServer) Launch(serverListenerAddress string) {
 
 	s.logger.Info("launching server", zap.String("listen_addr", serverListenerAddress))
 	tcpListener, err := net.Listen("tcp", serverListenerAddress)
 	if err != nil {
-		s.Shutdown(fmt.Errorf("tcp listening to %q: %w", serverListenerAddress, err))
+		s.Shutter.Shutdown(fmt.Errorf("tcp listening to %q: %w", serverListenerAddress, err))
 		return
 	}
 
 	errorLogger, err := zap.NewStdLogAt(s.logger, zap.ErrorLevel)
 	if err != nil {
-		s.Shutdown(fmt.Errorf("unable to create logger: %w", err))
+		s.Shutter.Shutdown(fmt.Errorf("unable to create logger: %w", err))
 		return
 	}
 
@@ -169,14 +182,14 @@ func (s *ConnectWebServer) Launch(serverListenerAddress string) {
 		s.logger.Info("serving over TLS", zap.String("listen_addr", serverListenerAddress))
 		srv.TLSConfig = s.options.SecureTLSConfig
 		if err := srv.ServeTLS(tcpListener, "", ""); err != nil {
-			s.Shutdown(fmt.Errorf("serve (TLS) failed: %w", err))
+			s.Shutter.Shutdown(fmt.Errorf("serve (TLS) failed: %w", err))
 			return
 		}
 
 	} else if s.options.IsPlainText {
 		s.logger.Info("serving plaintext", zap.String("listen_addr", serverListenerAddress))
 		if err := srv.Serve(tcpListener); err != nil {
-			s.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
+			s.Shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
 			return
 		}
 	}
@@ -192,6 +205,9 @@ func (s *ConnectWebServer) checkHealth(ctx context.Context) (isReady bool, out i
 	return s.options.HealthCheck(ctx)
 }
 
+func (s *ConnectWebServer) HealthHandler() http.Handler {
+	return http.HandlerFunc(s.healthCheckHandler)
+}
 func (s *ConnectWebServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	isReady, out, err := s.checkHealth(r.Context())
 
