@@ -54,6 +54,10 @@ type ConnectWebServer struct {
 	handler http.Handler
 }
 
+func (s *ConnectWebServer) Error() error {
+       return s.Shutter.Err()
+}
+
 type HandlerGetter func(opts ...connect.HandlerOption) (string, http.Handler)
 
 func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServer {
