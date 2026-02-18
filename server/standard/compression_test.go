@@ -70,6 +70,22 @@ func TestCompressionHandler(t *testing.T) {
 			expectedOutEncoded: "gzip",
 		},
 		{
+			name: "accept-encoding with gzip and deflate",
+			headers: map[string][]string{
+				"accept-encoding": {"gzip, deflate"},
+			},
+			expectedStatus:     http.StatusOK,
+			expectedOutEncoded: "gzip",
+		},
+		{
+			name: "accept-encoding with gzip prefix space",
+			headers: map[string][]string{
+				"accept-encoding": {"deflate, gzip"},
+			},
+			expectedStatus:     http.StatusOK,
+			expectedOutEncoded: "gzip",
+		},
+		{
 			name: "no supported compression found",
 			headers: map[string][]string{
 				"accept-encoding": {"unsupported"},
