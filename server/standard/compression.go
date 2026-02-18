@@ -19,7 +19,7 @@ func CompressionHandler(enforceCompression bool, h http.Handler) http.Handler {
 				writeBadRequest(w, fmt.Sprintf("grpc-encoding should be a single value, got: %v", vv))
 				return
 			}
-			compressor = vv[0]
+			compressor = strings.TrimSpace(vv[0])
 			if compressor != "" {
 				if encoding.GetCompressor(compressor) == nil {
 					//encoding specifically selected by user is not supported
@@ -34,11 +34,11 @@ func CompressionHandler(enforceCompression bool, h http.Handler) http.Handler {
 		}
 
 		if c := firstSupportedCompressor(r.Header.Values("grpc-accept-encoding")); c != "" {
-			compressor = c
+			compressor = strings.TrimSpace(c)
 		} else if c := firstSupportedCompressor(r.Header.Values("connect-accept-encoding")); c != "" {
-			compressor = c
+			compressor = strings.TrimSpace(c)
 		} else if c := firstSupportedCompressor(r.Header.Values("accept-encoding")); c != "" {
-			compressor = c
+			compressor = strings.TrimSpace(c)
 		} else {
 			if enforceCompression {
 				writeBadRequest(w, "no supported compression found.")
@@ -56,7 +56,7 @@ func CompressionHandler(enforceCompression bool, h http.Handler) http.Handler {
 func firstSupportedCompressor(compressors []string) string {
 	for _, cs := range compressors {
 		for _, c := range strings.Split(cs, ",") {
-			if encoding.GetCompressor(c) != nil {
+			if encoding.GetCompressor(strings.TrimSpace(c)) != nil {
 				return c
 			}
 		}
