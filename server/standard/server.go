@@ -146,11 +146,9 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 
 		muxRoot.Path("/").Handler(healthHandler)
 		muxRoot.Path("/healthz").Handler(healthHandler)
-		muxRoot.PathPrefix("/").Handler(s.grpcServer)
-
-		compressionHandler := CompressionHandler(s.options.EnforceCompression, muxRoot)
+		muxRoot.PathPrefix("/").Handler(CompressionHandler(s.options.EnforceCompression, s.grpcServer))
 		s.httpServer = &http.Server{
-			Handler:  h2c.NewHandler(compressionHandler, h2s),
+			Handler:  h2c.NewHandler(muxRoot, h2s),
 			ErrorLog: httpErrorLogger,
 		}
 

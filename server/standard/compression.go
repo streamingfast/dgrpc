@@ -56,7 +56,7 @@ func CompressionHandler(enforceCompression bool, h http.Handler) http.Handler {
 func firstSupportedCompressor(compressors []string) string {
 	for _, cs := range compressors {
 		for _, c := range strings.Split(cs, ",") {
-			if encoding.GetCompressor(strings.TrimSpace(c)) != nil {
+			if encoding.GetCompressor(strings.TrimSpace(strings.Split(c, ";")[0])) != nil {
 				return c
 			}
 		}
