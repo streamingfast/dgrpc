@@ -13,6 +13,11 @@ func CompressionHandler(enforceCompression bool, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		compressor := "identity"
 
+		if strings.HasPrefix(r.URL.RequestURI(), "/grpc.health") {
+			h.ServeHTTP(w, r)
+			return
+		}
+
 		vv := r.Header.Values("grpc-encoding")
 		if len(vv) > 0 {
 			if len(vv) != 1 {
