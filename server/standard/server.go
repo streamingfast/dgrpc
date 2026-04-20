@@ -129,7 +129,7 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 		return
 	}
 
-	httpErrorLogger, err := zap.NewStdLogAt(s.logger(), zap.ErrorLevel)
+	httpErrorLogger, err := server.NewHTTPErrorLogger(s.logger(), s.options.SuppressedHTTPErrorPatterns)
 	if err != nil {
 		s.shutter.Shutdown(fmt.Errorf("unable to create logger: %w", err))
 		return

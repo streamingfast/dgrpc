@@ -170,7 +170,7 @@ func (s *ConnectWebServer) Launch(serverListenerAddress string) {
 		return
 	}
 
-	errorLogger, err := zap.NewStdLogAt(s.logger, zap.ErrorLevel)
+	errorLogger, err := server.NewHTTPErrorLogger(s.logger, s.options.SuppressedHTTPErrorPatterns)
 	if err != nil {
 		s.Shutter.Shutdown(fmt.Errorf("unable to create logger: %w", err))
 		return

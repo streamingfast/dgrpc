@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/tls"
+	"regexp"
 	"net/http"
 	"net/url"
 	"time"
@@ -30,6 +31,9 @@ type Options struct {
 
 	Registrator     func(gs *grpc.Server)
 	SecureTLSConfig *tls.Config
+
+	// SuppressedHTTPErrorPatterns holds patterns whose matching http.Server error-log lines are silently dropped.
+	SuppressedHTTPErrorPatterns []*regexp.Regexp
 
 	// ConnectWeb-only options
 	ConnectWebReflectionServices []string
@@ -321,5 +325,19 @@ func OverrideTraceID() Option {
 func WithConnectWebHTTPHandlers(handlerGetters []HTTPHandlerGetter) Option {
 	return func(options *Options) {
 		options.ConnectWebHTTPHandlers = handlerGetters
+	}
+}
+
+// WithSuppressHTTPError registers one or more regexp patterns. Any line written to
+// http.Server.ErrorLog whose text matches at least one pattern will be silently
+// dropped instead of being forwarded to the zap logger. This is useful to filter
+// out noisy-but-harmless messages such as TLS handshake errors from health probes.
+//
+// Example - suppress EOF TLS handshake noise:
+//
+//	dgrpc.WithSuppressHTTPError(regexp.MustCompile("TLS handshake error.*EOF"))
+func WithSuppressHTTPError(patterns ...*regexp.Regexp) Option {
+	return func(options *Options) {
+		options.SuppressedHTTPErrorPatterns = append(options.SuppressedHTTPErrorPatterns, patterns...)
 	}
 }
