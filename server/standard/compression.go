@@ -32,7 +32,7 @@ func CompressionHandler(enforceCompression bool, h http.Handler) http.Handler {
 					return
 				}
 
-				zlog.Info("compression enabled", zap.String("grpc-encoding", compressor))
+				zlog.Debug("compression enabled", zap.String("grpc-encoding", compressor))
 				h.ServeHTTP(w, r)
 				return
 			}
@@ -51,7 +51,7 @@ func CompressionHandler(enforceCompression bool, h http.Handler) http.Handler {
 			}
 		}
 
-		zlog.Info("compression enabled", zap.String("grpc-encoding", compressor))
+		zlog.Debug("compression enabled", zap.String("grpc-encoding", compressor))
 		r.Header.Add("grpc-encoding", compressor)
 		h.ServeHTTP(w, r)
 

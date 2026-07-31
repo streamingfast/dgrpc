@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Deprecation** The `dgrpc.ListenAndServe` is deprecated sses `server := dgrpc.NewServer2(options...)` with the `dgrpc.WithHealthCheck(dgrpc.HealthCheckOverHTTP, ...)` then `go server.Launch()` instead.
 - move from deprecated `github.com/bufbuild/connect-go` to `connectrpc.com/connect`
 
+### Changed
+
+- Demote the per-request `compression enabled` log from Info to Debug — it fired on every request and carried no actionable signal.
+
 ## 2020-03-21
 
 ### Changed
