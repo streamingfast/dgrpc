@@ -142,6 +142,7 @@ func WithConnectPermissiveCORS() Option {
 				"Grpc-Status-Details-Bin",
 			},
 			MaxAge: int(2 * time.Hour / time.Second),
+			AllowCredentials: true,
 		})
 
 	}
