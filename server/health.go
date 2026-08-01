@@ -15,7 +15,7 @@ const (
 	HealthCheckOverGRPC HealthCheckOver = 1 << 1
 )
 
-type HealthCheck func(ctx context.Context) (isReady bool, out interface{}, err error)
+type HealthCheck func(ctx context.Context) (isReady bool, out any, err error)
 
 // HealthCheckOver is a bit field used by the `StandardServer` to decide on what to
 // serve the health check when it's defined.
@@ -44,6 +44,22 @@ func (c HealthGRPCHandler) Check(ctx context.Context, _ *pbhealth.HealthCheckReq
 	}
 
 	return &pbhealth.HealthCheckResponse{Status: status}, nil
+}
+
+// List returns a snapshot of the health of every service served by this handler. The
+// handler serves a single, server-wide health check, so the snapshot always contains a
+// single entry keyed by the empty service name.
+func (c HealthGRPCHandler) List(ctx context.Context, _ *pbhealth.HealthListRequest) (*pbhealth.HealthListResponse, error) {
+	status, err := c.healthStatus(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pbhealth.HealthListResponse{
+		Statuses: map[string]*pbhealth.HealthCheckResponse{
+			"": {Status: status},
+		},
+	}, nil
 }
 
 func (c HealthGRPCHandler) Watch(req *pbhealth.HealthCheckRequest, stream pbhealth.Health_WatchServer) error {
