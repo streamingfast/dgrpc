@@ -26,6 +26,22 @@ func (c HealthGRPCHandler) Check(ctx context.Context, req *connect.Request[grpc_
 	return connect.NewResponse(&grpc_health_v1.HealthCheckResponse{Status: status}), nil
 }
 
+// List returns a snapshot of the health of every service served by this handler. The
+// handler serves a single, server-wide health check, so the snapshot always contains a
+// single entry keyed by the empty service name.
+func (c HealthGRPCHandler) List(ctx context.Context, req *connect.Request[grpc_health_v1.HealthListRequest]) (*connect.Response[grpc_health_v1.HealthListResponse], error) {
+	status, err := c.healthStatus(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return connect.NewResponse(&grpc_health_v1.HealthListResponse{
+		Statuses: map[string]*grpc_health_v1.HealthCheckResponse{
+			"": {Status: status},
+		},
+	}), nil
+}
+
 func (c HealthGRPCHandler) Watch(ctx context.Context, req *connect.Request[grpc_health_v1.HealthCheckRequest], stream *connect.ServerStream[grpc_health_v1.HealthCheckResponse]) error {
 	currentStatus := grpc_health_v1.HealthCheckResponse_UNKNOWN
 
