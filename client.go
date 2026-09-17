@@ -35,7 +35,7 @@ var tlsClientDialOption = grpc.WithTransportCredentials(credentials.NewClientTLS
 // MaxResponseSize is the largest gRPC response message in bytes that clients created by this
 // package receive and that servers created by this package send. Requests keep the gRPC
 // limits, they are expected to be small.
-const MaxResponseSize = min(2*1024*1024*1024, math.MaxInt)
+const MaxResponseSize = math.MaxInt32
 
 var largeRecvMsgSizeCallOption = grpc.MaxCallRecvMsgSize(MaxResponseSize)
 var hangOnResolveErrorCallOption = grpc.WaitForReady(true)
