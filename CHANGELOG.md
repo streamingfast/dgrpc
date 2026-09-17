@@ -5,6 +5,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Clients created with `NewClientConn` (and the `NewInternalClient`/`NewExternalClient` helpers) receive messages up to `dgrpc.MaxResponseSize` (2 GiB − 1 byte, `math.MaxInt32`) instead of 1 GiB. Standard servers send messages up to `dgrpc.MaxResponseSize`, the same as the grpc-go default. Request limits (client send, server receive) are unchanged.
 - Add zstd support for connectrpc server
 - Remove connectrpc error middleware by default. You need to add it `connectrpc.NewErrorsInterceptor`
 - Added abiliy to map connectrpc error

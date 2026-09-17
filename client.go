@@ -17,6 +17,7 @@ package dgrpc
 import (
 	"crypto/tls"
 	"fmt"
+	"math"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -31,7 +32,12 @@ var roundrobinDialOption = grpc.WithDefaultServiceConfig(`{"loadBalancingConfig"
 var insecureDialOption = grpc.WithTransportCredentials(insecure.NewCredentials())
 var tlsClientDialOption = grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, ""))
 
-var largeRecvMsgSizeCallOption = grpc.MaxCallRecvMsgSize(1024 * 1024 * 1024)
+// MaxResponseSize is the largest gRPC response message in bytes that clients created by this
+// package receive and that servers created by this package send. Requests keep the gRPC
+// limits, they are expected to be small.
+const MaxResponseSize = math.MaxInt32
+
+var largeRecvMsgSizeCallOption = grpc.MaxCallRecvMsgSize(MaxResponseSize)
 var hangOnResolveErrorCallOption = grpc.WaitForReady(true)
 var hangOnResolveErrorDialOption = grpc.WithDefaultCallOptions(hangOnResolveErrorCallOption)
 
@@ -86,7 +92,7 @@ func NewExternalClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*gr
 }
 
 // NewClientConn creates a default gRPC ClientConn with round robin, keepalive, OpenTelemetry tracing and
-// large receive message size (max 1 GiB) configured.
+// large receive message size (max [MaxResponseSize]) configured.
 //
 // If the remoteAddr starts with "xds://", it will use xDS credentials, transport credentials are not
 // configured and default gRPC applies which is full TLS.

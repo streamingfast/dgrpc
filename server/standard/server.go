@@ -28,6 +28,7 @@ import (
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/tracelog"
 	"github.com/streamingfast/shutter"
@@ -410,6 +411,7 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 	s := grpc.NewServer(
 		append([]grpc.ServerOption{
 			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
+			grpc.MaxSendMsgSize(dgrpc.MaxResponseSize),
 			grpc.KeepaliveEnforcementPolicy(
 				keepalive.EnforcementPolicy{
 					MinTime:             15 * time.Second,
