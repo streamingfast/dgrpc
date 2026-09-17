@@ -32,14 +32,12 @@ var roundrobinDialOption = grpc.WithDefaultServiceConfig(`{"loadBalancingConfig"
 var insecureDialOption = grpc.WithTransportCredentials(insecure.NewCredentials())
 var tlsClientDialOption = grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, ""))
 
-// MaxMessageSize is the largest gRPC message in bytes that clients created by this package
-// send or receive and that servers created by this package send. It fits blocks up to 3 GiB
-// with room for the response around them. gRPC frames a message with a 4 bytes length, so
-// it cannot go past 4 GiB.
-const MaxMessageSize = min(3584*1024*1024, math.MaxInt)
+// MaxResponseSize is the largest gRPC response message in bytes that clients created by this
+// package receive and that servers created by this package send. Requests keep the gRPC
+// limits, they are expected to be small.
+const MaxResponseSize = min(2*1024*1024*1024, math.MaxInt)
 
-var largeRecvMsgSizeCallOption = grpc.MaxCallRecvMsgSize(MaxMessageSize)
-var largeSendMsgSizeCallOption = grpc.MaxCallSendMsgSize(MaxMessageSize)
+var largeRecvMsgSizeCallOption = grpc.MaxCallRecvMsgSize(MaxResponseSize)
 var hangOnResolveErrorCallOption = grpc.WaitForReady(true)
 var hangOnResolveErrorDialOption = grpc.WithDefaultCallOptions(hangOnResolveErrorCallOption)
 
@@ -94,7 +92,7 @@ func NewExternalClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*gr
 }
 
 // NewClientConn creates a default gRPC ClientConn with round robin, keepalive, OpenTelemetry tracing and
-// large send and receive message size (max [MaxMessageSize]) configured.
+// large receive message size (max [MaxResponseSize]) configured.
 //
 // If the remoteAddr starts with "xds://", it will use xDS credentials, transport credentials are not
 // configured and default gRPC applies which is full TLS.
@@ -107,7 +105,6 @@ func NewClientConn(remoteAddr string, extraOpts ...grpc.DialOption) (*grpc.Clien
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithDefaultCallOptions(
 			largeRecvMsgSizeCallOption,
-			largeSendMsgSizeCallOption,
 		),
 	}
 

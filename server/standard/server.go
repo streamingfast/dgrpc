@@ -411,7 +411,7 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 	s := grpc.NewServer(
 		append([]grpc.ServerOption{
 			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
-			grpc.MaxSendMsgSize(dgrpc.MaxMessageSize),
+			grpc.MaxSendMsgSize(dgrpc.MaxResponseSize),
 			grpc.KeepaliveEnforcementPolicy(
 				keepalive.EnforcementPolicy{
 					MinTime:             15 * time.Second,
