@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add `List` to `server.HealthGRPCHandler` and `server/connectrpc.HealthGRPCHandler`, implementing the `grpc.health.v1.Health/List` RPC added to the `HealthServer` interface in gRPC-Go v1.82.0. Both return a single entry keyed by the empty service name, matching the server-wide health check these handlers expose.
+- Add `server.WithCodeLevelFunc` to let callers of `dgrpc/server/standard` override the gRPC-code-to-zap-level mapping used for the request-completion log line, instead of only the global `standard.Verbosity` knob. Useful for services (e.g. ones doing admission control) where a code like `codes.ResourceExhausted` is routine and shouldn't default to `Info`.
 
 ### Changed
 
