@@ -10,7 +10,9 @@ import (
 	"connectrpc.com/connect"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
 
 type Options struct {
@@ -28,6 +30,11 @@ type Options struct {
 	PostUnaryInterceptors    []grpc.UnaryServerInterceptor
 	PostStreamInterceptors   []grpc.StreamServerInterceptor
 	ConnectExtraInterceptors []connect.Interceptor
+
+	// CodeLevelFunc, when set, overrides the default gRPC-code-to-zap-level mapping
+	// used by the `dgrpc/server/standard` server for its request-completion log line.
+	// See WithCodeLevelFunc.
+	CodeLevelFunc func(codes.Code) zapcore.Level
 
 	Registrator     func(gs *grpc.Server)
 	SecureTLSConfig *tls.Config
@@ -305,6 +312,25 @@ func WithConnectStrictContentType(allowJSON bool) Option {
 func WithGRPCServerOptions(opts ...grpc.ServerOption) Option {
 	return func(options *Options) {
 		options.ServerOptions = opts
+	}
+}
+
+// WithCodeLevelFunc lets you override how gRPC status codes are mapped to zap log
+// levels for the standard server's request-completion log line ("finished
+// unary/streaming call with code X").
+//
+// By default that mapping is controlled by the package-level `standard.Verbosity`
+// variable, which applies the same code-to-level rules to every service using
+// `dgrpc/server/standard`. A caller that gives specific meaning to a code — for
+// example using `codes.ResourceExhausted` for routine admission-control
+// backpressure — can use this option to log it at a different level without
+// affecting other `dgrpc` users.
+//
+// **Important** Only taken into consideration by the `dgrpc/server/standard`
+// server, ignored by all other server implementations.
+func WithCodeLevelFunc(f func(codes.Code) zapcore.Level) Option {
+	return func(options *Options) {
+		options.CodeLevelFunc = f
 	}
 }
 

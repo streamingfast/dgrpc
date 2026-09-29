@@ -59,6 +59,9 @@ var notReadyResponse = map[string]interface{}{"is_ready": false}
 // For now, this controls server logging of gRCP code to zap level which
 // reduce some of the case into `INFO` level and some more like `OK` on `DEBUG`
 // level.
+//
+// A single server can instead override the whole gRPC-code-to-zap-level mapping,
+// ignoring Verbosity entirely, via server.WithCodeLevelFunc.
 var Verbosity = 3
 
 // StandardServer is actually a thin wrapper struct around an `*http.StandardServer` and a
@@ -353,7 +356,7 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 	zopts := []grpc_zap.Option{
 		grpc_zap.WithDurationField(grpc_zap.DurationToTimeMillisField),
 		grpc_zap.WithDecider(defaultLoggingDecider),
-		grpc_zap.WithLevels(defaultServerCodeLevel),
+		grpc_zap.WithLevels(codeLevelFunc(options)),
 	}
 
 	// Zap base server interceptor
@@ -442,6 +445,17 @@ func defaultLoggingDecider(fullMethodName string, err error) bool {
 	}
 
 	return true
+}
+
+// codeLevelFunc returns the gRPC-code-to-zap-level mapping to use, preferring
+// a caller-supplied override (see server.WithCodeLevelFunc) over the built-in
+// Verbosity-based default.
+func codeLevelFunc(options *server.Options) func(codes.Code) zapcore.Level {
+	if options.CodeLevelFunc != nil {
+		return options.CodeLevelFunc
+	}
+
+	return defaultServerCodeLevel
 }
 
 func defaultServerCodeLevel(code codes.Code) zapcore.Level {
