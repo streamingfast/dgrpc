@@ -1,11 +1,15 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/streamingfast/dgrpc/examples/internal/impl"
+	pbacme "github.com/streamingfast/dgrpc/examples/internal/pb/acme/v1"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/factory"
 	"github.com/streamingfast/logging"
@@ -16,20 +20,30 @@ import (
 var zlog, _ = logging.ApplicationLogger("example", "github.com/streamingfast/dgrpc/examples/secure-server")
 
 func main() {
-	secureConfig, err := server.SecuredByX509KeyPair("./example/cert/cert.pem", "./example/cert/key.pem")
-	if err != nil {
-		panic(fmt.Errorf("unable to create X509 secure config: %w", err))
+	// LISTEN_ADDR sets the listen address, TLS uses the X509 key pair files by default, a trailing `*`
+	// switches to the built-in self-signed (snake oil) certificate, e.g. `:9000*`
+	listenAddr := cmp.Or(os.Getenv("LISTEN_ADDR"), "localhost:9000")
+	listenAddr, insecureTLS := strings.CutSuffix(listenAddr, "*")
+
+	var tlsOption server.Option
+	if insecureTLS {
+		tlsOption = server.WithInsecureServer()
+	} else {
+		secureConfig, err := server.SecuredByX509KeyPair("./example/cert/cert.pem", "./example/cert/key.pem")
+		if err != nil {
+			panic(fmt.Errorf("unable to create X509 secure config: %w", err))
+		}
+		tlsOption = server.WithSecureServer(secureConfig)
 	}
 
 	srv := factory.ServerFromOptions(
-		server.WithSecureServer(secureConfig),
+		tlsOption,
 		server.WithLogger(zlog),
-		server.WithHealthCheck(server.HealthCheckOverGRPC, healthCheck),
+		server.WithHealthCheck(server.HealthCheckOverHTTP|server.HealthCheckOverGRPC, healthCheck),
 	)
 
 	srv.RegisterService(func(gs grpc.ServiceRegistrar) {
-		// Register some more gRPC services here against `gs`
-		// pbstatedb.RegisterStateService(gs, implementation)
+		pbacme.RegisterPingPongServiceServer(gs, impl.NewPingPongGRPCServer("secure-server-1", zlog))
 	})
 
 	srv.OnTerminated(func(err error) {
@@ -42,7 +56,7 @@ func main() {
 		os.Exit(1)
 	})
 
-	go srv.Launch("localhost:9000")
+	go srv.Launch(listenAddr)
 
 	// We wait 5m before shutting down, in reality you would tie that so lifecycle of your app
 	time.Sleep(5 * time.Minute)

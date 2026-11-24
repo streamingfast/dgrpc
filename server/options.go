@@ -42,6 +42,12 @@ type Options struct {
 	// SuppressedHTTPErrorPatterns holds patterns whose matching http.Server error-log lines are silently dropped.
 	SuppressedHTTPErrorPatterns []*regexp.Regexp
 
+	// HTTP2ReadIdleTimeout is the idle time after which the server sends an HTTP/2 PING, 0 disables
+	// server PINGs. HTTP2PingTimeout is how long to wait for the ack before closing the connection.
+	// See WithHTTP2Pings.
+	HTTP2ReadIdleTimeout time.Duration
+	HTTP2PingTimeout     time.Duration
+
 	// ConnectWeb-only options
 	ConnectWebReflectionServices []string
 	ConnectWebAllowJSON          bool
@@ -60,6 +66,9 @@ func NewOptions() *Options {
 		Logger:          zlog,
 		IsPlainText:     true,
 		OverrideTraceID: false,
+
+		HTTP2ReadIdleTimeout: DefaultHTTP2ReadIdleTimeout,
+		HTTP2PingTimeout:     DefaultHTTP2PingTimeout,
 	}
 }
 
@@ -365,5 +374,21 @@ func WithConnectWebHTTPHandlers(handlerGetters []HTTPHandlerGetter) Option {
 func WithSuppressHTTPError(patterns ...*regexp.Regexp) Option {
 	return func(options *Options) {
 		options.SuppressedHTTPErrorPatterns = append(options.SuppressedHTTPErrorPatterns, patterns...)
+	}
+}
+
+// WithHTTP2Pings configures server-side HTTP/2 PINGs for the `dgrpc/server/standard` and
+// `dgrpc/server/connectrpc` servers, on both TLS and cleartext (h2c) connections.
+//
+// When a connection received nothing for `readIdleTimeout`, the server sends a PING. If the
+// ack doesn't come within `pingTimeout`, the connection is closed, freeing its streams. This
+// detects connections silently killed in the middle (e.g. behind a load balancer).
+//
+// Defaults are [DefaultHTTP2ReadIdleTimeout] (30s) and [DefaultHTTP2PingTimeout] (15s). A
+// `readIdleTimeout` of 0 disables server PINGs.
+func WithHTTP2Pings(readIdleTimeout, pingTimeout time.Duration) Option {
+	return func(options *Options) {
+		options.HTTP2ReadIdleTimeout = readIdleTimeout
+		options.HTTP2PingTimeout = pingTimeout
 	}
 }
