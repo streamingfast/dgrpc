@@ -1,22 +1,22 @@
 # syntax=docker/dockerfile:1
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS builder
+
+# Build from the repository root so the examples compile against the local dgrpc sources (go.work):
+#
+#   docker build -f examples/Dockerfile -t dgrpc-examples .
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
 WORKDIR /src
 
-COPY go.mod go.sum ./
+RUN apk add build-base
 
-ENV GOPRIVATE=github.com/streamingfast/hikari-bot
+COPY . .
 
 ARG TARGETOS TARGETARCH
-# todo: move to its own step build
-RUN apk add build-base
-RUN --mount=target=. \
-    --mount=type=ssh \
-    --mount=type=cache,target=/root/.cache/go-build \
+RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /app/plain-text-server ./plain-text-server && \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /app/secure-server ./secure-server && \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /app/xds-traffic-director ./xds-traffic-director && \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /app/plain-text-server ./examples/plain-text-server && \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /app/secure-server ./examples/secure-server && \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /app/connect-server ./examples/connect-server && \
     echo "Done"
 
 FROM alpine
@@ -27,8 +27,8 @@ RUN mkdir /app
 
 COPY --from=builder /app/plain-text-server /app/
 COPY --from=builder /app/secure-server /app/
-COPY --from=builder /app/xds-traffic-director /app/
+COPY --from=builder /app/connect-server /app/
 
 WORKDIR /app
 
-EXPOSE 9000
+EXPOSE 9000 8080

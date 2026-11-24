@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dgrpc-pings
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dgrpc-pings
+  template:
+    metadata:
+      labels:
+        app: dgrpc-pings
+    spec:
+      containers:
+        - name: server
+          # Build & push with: docker build -f examples/Dockerfile -t <registry>/dgrpc-examples:dev . && docker push <registry>/dgrpc-examples:dev
+          image: REGISTRY/dgrpc-examples:dev
+          # secure-server is the gRPC (`standard`) server, use /app/connect-server for the `connectrpc` one
+          command: ["/app/secure-server"]
+          env:
+            # Trailing `*` is TLS with the built-in self-signed (snake oil) certificate, same as production,
+            # the LB doesn't validate it
+            - name: LISTEN_ADDR
+              value: ":9000*"
+            # Logs HTTP/2 frames (SETTINGS, PING, ack) to see what the load balancer does
+            - name: GODEBUG
+              value: http2debug=2
+          ports:
+            - name: grpc
+              containerPort: 9000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: grpc
+              scheme: HTTPS

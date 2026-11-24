@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dgrpc-pings
+  annotations:
+    kubernetes.io/ingress.class: gce
+    # No HTTP frontend: gRPC needs HTTP/2, which the GFE only speaks over HTTPS
+    kubernetes.io/ingress.allow-http: "false"
+spec:
+  tls:
+    - secretName: dgrpc-pings-tls
+  defaultBackend:
+    service:
+      name: dgrpc-pings
+      port:
+        number: 9000

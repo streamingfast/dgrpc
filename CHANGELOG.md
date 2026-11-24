@@ -5,6 +5,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Add server-side HTTP/2 PINGs to the `standard` and `connectrpc` servers, on both TLS and cleartext (h2c) connections. A PING is sent after 30s without traffic and the connection is closed if not acked within 15s, so streams behind a silently dead load-balancer connection are freed. Configure (or disable with `0`) through `server.WithHTTP2Pings(readIdleTimeout, pingTimeout)`.
+- Add `server.NewHTTPServer` that builds the correctly configured `http.Server` (h2c + HTTP/2 settings) shared by dgrpc servers.
+
+### Fixed
+
+- Fix HTTP/2 settings of the `standard` and `connectrpc` servers being ignored over TLS (`net/http` uses its built-in HTTP/2 server there, not the `http2.Server` given to `h2c.NewHandler`). TLS keeps Go's default `MAX_CONCURRENT_STREAMS` of 250, h2c keeps 1000.
+
+### Changed
+
+- `standard` server no longer sets `grpc.KeepaliveParams`/`grpc.KeepaliveEnforcementPolicy`: it serves through `grpc.Server.ServeHTTP`, which bypasses grpc-go's transport so they never had any effect. Use `server.WithHTTP2Pings` instead.
+- `connectrpc.ConnectWebServer.ServeHTTP` no longer wraps requests with h2c; h2c is applied by `Launch`.
+
 - Clients created with `NewClientConn` (and the `NewInternalClient`/`NewExternalClient` helpers) receive messages up to `dgrpc.MaxResponseSize` (2 GiB − 1 byte, `math.MaxInt32`) instead of 1 GiB. Standard servers send messages up to `dgrpc.MaxResponseSize`, the same as the grpc-go default. Request limits (client send, server receive) are unchanged.
 - Add zstd support for connectrpc server
 - Remove connectrpc error middleware by default. You need to add it `connectrpc.NewErrorsInterceptor`

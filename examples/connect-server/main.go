@@ -1,9 +1,11 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -28,10 +30,19 @@ func main() {
 		},
 	}
 
+	// LISTEN_ADDR sets the listen address, plain-text by default, a trailing `*` switches to TLS using
+	// the built-in self-signed (snake oil) certificate, e.g. `:8080*`
+	listenAddr := cmp.Or(os.Getenv("LISTEN_ADDR"), "localhost:8080")
+	listenAddr, insecureTLS := strings.CutSuffix(listenAddr, "*")
+	tlsOption := server.WithPlainTextServer()
+	if insecureTLS {
+		tlsOption = server.WithInsecureServer()
+	}
+
 	// Create Connect server
 	srv := connectrpc.New(
 		handlerGetters,
-		server.WithPlainTextServer(),
+		tlsOption,
 		server.WithLogger(zlog),
 		server.WithHealthCheck(server.HealthCheckOverHTTP, healthCheck),
 		server.WithConnectPermissiveCORS(),
@@ -47,12 +58,12 @@ func main() {
 		os.Exit(1)
 	})
 
-	zlog.Info("starting Connect server on localhost:8080")
+	zlog.Info("starting Connect server", zap.String("listen_addr", listenAddr))
 	zlog.Info("gRPC-Web example: curl -H 'Content-Type: application/json' -d '{\"clientId\":\"test\",\"message\":\"hello\"}' http://localhost:8080/acme.v1.PingPongService/GetPing")
 	zlog.Info("Connect example: curl -H 'Content-Type: application/json' -d '{\"clientId\":\"test\",\"message\":\"hello\"}' http://localhost:8080/acme.v1.PingPongService/GetPing")
 	zlog.Info("health check: curl http://localhost:8080/healthz")
 
-	go srv.Launch("localhost:8080")
+	go srv.Launch(listenAddr)
 
 	// We wait 5m before shutting down, in reality you would tie that to lifecycle of your app
 	time.Sleep(5 * time.Minute)

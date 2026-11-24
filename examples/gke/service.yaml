@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dgrpc-pings
+  annotations:
+    # HTTP/2 between the load balancer and the pod, the path server PINGs act on
+    cloud.google.com/app-protocols: '{"grpc":"HTTP2"}'
+    cloud.google.com/backend-config: '{"default":"dgrpc-pings"}'
+    cloud.google.com/neg: '{"ingress": true}'
+spec:
+  type: ClusterIP
+  selector:
+    app: dgrpc-pings
+  ports:
+    - name: grpc
+      port: 9000
+      targetPort: grpc
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: dgrpc-pings
+spec:
+  # Backend service timeout, defaults to 30s which kills long streams: allow a stream to live 1h
+  timeoutSec: 3600
+  healthCheck:
+    type: HTTP2
+    requestPath: /healthz
+    port: 9000

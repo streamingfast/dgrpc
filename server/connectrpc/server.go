@@ -35,8 +35,6 @@ import (
 	"github.com/streamingfast/dgrpc/server/tracelog"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 )
 
 var readyResponse = map[string]interface{}{"is_ready": true}
@@ -141,9 +139,8 @@ func New(handlerGetters []HandlerGetter, opts ...server.Option) *ConnectWebServe
 		handler = options.ConnectWebCORS.Handler(mux)
 	}
 
-	srv.handler = h2c.NewHandler(gzhttp.GzipHandler(handler), &http2.Server{
-		MaxConcurrentStreams: 1000,
-	})
+	// h2c wrapping and HTTP/2 settings are applied in Launch through server.NewHTTPServer
+	srv.handler = gzhttp.GzipHandler(handler)
 
 	return srv
 }
@@ -176,15 +173,11 @@ func (s *ConnectWebServer) Launch(serverListenerAddress string) {
 		return
 	}
 
-	srv := &http.Server{
-		Handler:  s.handler,
-		ErrorLog: errorLogger,
-	}
+	srv := server.NewHTTPServer(s.handler, s.options, errorLogger)
 	s.OnTerminating(func(_ error) { srv.Close() })
 
 	if s.options.SecureTLSConfig != nil {
 		s.logger.Info("serving over TLS", zap.String("listen_addr", serverListenerAddress))
-		srv.TLSConfig = s.options.SecureTLSConfig
 		if err := srv.ServeTLS(tcpListener, "", ""); err != nil {
 			s.Shutter.Shutdown(fmt.Errorf("serve (TLS) failed: %w", err))
 			return

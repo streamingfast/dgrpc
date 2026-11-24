@@ -36,12 +36,9 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
-	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -139,10 +136,6 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 		return
 	}
 
-	h2s := &http2.Server{
-		MaxConcurrentStreams: 1000,
-	}
-
 	// We start an HTTP server only when having an health check that requires HTTP transport
 	if s.options.HealthCheck != nil && server.HealthCheckOverHTTP.IsActive(uint8(s.options.HealthCheckOver)) {
 		healthHandler := s.HealthHandler()
@@ -151,14 +144,10 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 		muxRoot.Path("/").Handler(healthHandler)
 		muxRoot.Path("/healthz").Handler(healthHandler)
 		muxRoot.PathPrefix("/").Handler(CompressionHandler(s.options.EnforceCompression, s.grpcServer))
-		s.httpServer = &http.Server{
-			Handler:  h2c.NewHandler(muxRoot, h2s),
-			ErrorLog: httpErrorLogger,
-		}
+		s.httpServer = server.NewHTTPServer(muxRoot, s.options, httpErrorLogger)
 
 		if s.options.SecureTLSConfig != nil {
 			s.logger().Info("serving gRPC (over HTTP router) (encrypted)", zap.String("listen_addr", serverListenerAddress))
-			s.httpServer.TLSConfig = s.options.SecureTLSConfig
 			if err := s.httpServer.ServeTLS(tcpListener, "", ""); err != nil {
 				s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve (TLS) failed: %w", err))
 				return
@@ -179,10 +168,7 @@ func (s *StandardServer) Launch(serverListenerAddress string) {
 	}
 
 	compressionHandler := CompressionHandler(s.options.EnforceCompression, s.grpcServer)
-	s.httpServer = &http.Server{
-		Handler:  h2c.NewHandler(compressionHandler, h2s),
-		ErrorLog: httpErrorLogger,
-	}
+	s.httpServer = server.NewHTTPServer(compressionHandler, s.options, httpErrorLogger)
 
 	s.logger().Info("serving gRPC", zap.String("listen_addr", serverListenerAddress))
 	if err := s.httpServer.Serve(tcpListener); err != nil {
@@ -415,18 +401,18 @@ func newGRPCServer(options *server.Options) *grpc.Server {
 		append([]grpc.ServerOption{
 			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
 			grpc.MaxSendMsgSize(dgrpc.MaxResponseSize),
-			grpc.KeepaliveEnforcementPolicy(
-				keepalive.EnforcementPolicy{
-					MinTime:             15 * time.Second,
-					PermitWithoutStream: true,
-				},
-			),
-			grpc.KeepaliveParams(
-				keepalive.ServerParameters{
-					Time:    30 * time.Second, // Ping the client if it is idle for this amount of time
-					Timeout: 10 * time.Second, // Wait this amount of time after the ping before assuming connection is dead
-				},
-			),
+			// This server is served through grpc.Server.ServeHTTP behind an http.Server, which bypasses
+			// grpc-go's own HTTP/2 transport. ServeHTTP only uses the stats handler and buffer pool, so
+			// every transport-level grpc.ServerOption is silently ignored, in particular:
+			//  - grpc.KeepaliveParams / grpc.KeepaliveEnforcementPolicy (see server.WithHTTP2Pings instead)
+			//  - grpc.MaxConcurrentStreams, grpc.InitialWindowSize, grpc.InitialConnWindowSize
+			//  - grpc.MaxHeaderListSize, grpc.ReadBufferSize, grpc.WriteBufferSize, grpc.SharedWriteBuffer
+			//  - grpc.ConnectionTimeout
+			//  - grpc.Creds: TLS is terminated by the http.Server, so peer.AuthInfo is not populated by grpc-go
+			// These are configured on the http.Server (HTTP2Config, MaxHeaderBytes, TLSConfig) instead, see
+			// server.NewHTTPServer. Message-level options (MaxRecvMsgSize, MaxSendMsgSize, compressors),
+			// interceptors and stats handlers are still honored.
+			// Passing any ignored option via server.WithGRPCServerOptions is accepted but has no effect.
 			grpc_middleware.WithStreamServerChain(streamInterceptors...),
 			grpc_middleware.WithUnaryServerChain(unaryInterceptors...),
 		}, options.ServerOptions...)...,
